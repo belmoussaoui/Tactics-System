@@ -202,6 +202,7 @@ Scene_BattleTS.prototype.start = function() {
 };
 
 Scene_BattleTS.prototype.update = function() {
+    $gameSelectorTS.update(BattleManagerTS.active());
     this.updateDestination();
     var active = this.isActive();
     $gameMap.update(active);
@@ -213,7 +214,6 @@ Scene_BattleTS.prototype.update = function() {
     }
     $gameTimer.update(active);
     $gameScreen.update();
-    $gameSelectorTS.update(BattleManagerTS.active());
     Scene_Base.prototype.update.call(this);
 };
 
@@ -254,7 +254,6 @@ Scene_BattleTS.prototype.isAnyInputWindowActive = function() {
 };
 
 Scene_BattleTS.prototype.updateDestination = function() {
-    console.log('updateDestination');
     if (this.isMapTouchOk()) {
         this.processMapTouch();
     } else {
@@ -267,9 +266,7 @@ Scene_BattleTS.prototype.isMapTouchOk = function() {
 };
 
 Scene_BattleTS.prototype.processMapTouch = function() {
-    console.log('processMapTouch');
     if (TouchInput.isTriggered()) {// || this._touchCount > 0) {
-        console.log('setDestination');
         var x = $gameMap.canvasToMapX(TouchInput.x);
         var y = $gameMap.canvasToMapY(TouchInput.y);
         $gameTemp.setDestination(x, y);
@@ -1076,7 +1073,7 @@ BattleManagerTS.isBattleEnd = function() {
 };
 
 BattleManagerTS.isTriggered = function() {
-    return Input.isTriggered('ok'); //|| TouchInput.isTriggered();
+    return Input.isTriggered('ok') || $gameSelectorTS.triggerTouchAction();
 };
 
 BattleManagerTS.isCancelled = function() {
@@ -1212,7 +1209,6 @@ Game_SelectorTS.prototype.moveByInput = function() {
 };
 
 Game_SelectorTS.prototype.moveByDestination = function() {
-    console.log($gameTemp.isDestinationValid());
     if (this.canMove() && !this.isWaiting() && $gameTemp.isDestinationValid()) {
         var x = $gameTemp.destinationX();
         var y = $gameTemp.destinationY();
@@ -1333,6 +1329,17 @@ Game_SelectorTS.prototype.screenY = function() {
     return Math.round(this.scrolledY() * th);
 };
 
+Game_SelectorTS.prototype.triggerTouchAction = function() {
+    if ($gameTemp.isDestinationValid()) {
+        var destX = $gameTemp.destinationX();
+        var destY = $gameTemp.destinationY();
+        if (this.x === destX && destY === this.y) {
+            $gameTemp.clearDestination();
+            return true;
+        }
+    }
+    return false;
+};
 
 //-----------------------------------------------------------------------------
 // Game_EventBattlerTS
