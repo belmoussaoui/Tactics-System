@@ -2053,6 +2053,32 @@ Window_BattleTargetTS.prototype.processCursorMove = function () {
     }
 };
 
+Window_BattleTargetTS.prototype.onTouch = function(triggered) {
+    var lastIndex = this.index();
+    var x = this.canvasToLocalX(TouchInput.x);
+    var y = this.canvasToLocalY(TouchInput.y);
+    var hitIndex = this.hitTest(x, y);
+    if (hitIndex >= 0) {
+        if (hitIndex === this.index()) {
+            if (triggered && this.isTouchOkEnabled()) {
+                this.processOk();
+            }
+        } else if (this.isCursorMovable()) {
+            this.select(hitIndex);
+        }
+    } else if (this._stayCount >= 10) {
+        if (y < this.padding) {
+            this.cursorUp();
+        } else if (y >= this.height - this.padding) {
+            this.cursorDown();
+        }
+    }
+    if (this.index() !== lastIndex) {
+        SoundManager.playCursor();
+        BattleManagerTS.performTransfer(this.target());
+    }
+};
+
 //-----------------------------------------------------------------------------
 // Window_BattleActor
 //
