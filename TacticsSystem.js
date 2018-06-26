@@ -385,7 +385,8 @@ Scene_BattleTS.prototype.selectEventSelection = function() {
 Scene_BattleTS.prototype.onEventOk = function() {
     var event = this._eventWindow.target();
     event.start();
-    BattleManagerTS.endAction()
+    BattleManagerTS.startEvent();
+    //BattleManagerTS.endAction()
     this._eventWindow.hide();
     this._actorCommandWindow.close();
 };
@@ -591,6 +592,9 @@ BattleManagerTS.update = function() {
         case 'battleEnd':
             this.updateBattleEnd();
             break;
+        case 'event':
+            this.endEvent();
+            break;
         }
     }
 };
@@ -604,6 +608,7 @@ BattleManagerTS.updateEvent = function() {
     switch (this._phase) {
     case 'playerExplore':
     case 'enemyPhase':
+    case 'event':
         return this.updateEventMain();
     }
 };
@@ -621,6 +626,7 @@ BattleManagerTS.updateEventMain = function() {
         return true;
     }
     if ($gameMap.isEventRunning()) {
+        console.log('ok');
         return true;
     }
     return false;
@@ -874,6 +880,16 @@ BattleManagerTS.updateLastTarget = function() {
         battler.createBlueCells();
         this.updateBlueCells();
     }
+};
+
+BattleManagerTS.startEvent = function() {
+    this._phase = 'event';
+};
+
+
+BattleManagerTS.endEvent = function() {
+    console.log('end');
+    this.endAction();
 };
 
 BattleManagerTS.endTurn = function() {
