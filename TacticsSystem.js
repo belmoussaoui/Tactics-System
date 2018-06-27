@@ -626,7 +626,6 @@ BattleManagerTS.updateEventMain = function() {
         return true;
     }
     if ($gameMap.isEventRunning()) {
-        console.log('ok');
         return true;
     }
     return false;
@@ -888,7 +887,6 @@ BattleManagerTS.startEvent = function() {
 
 
 BattleManagerTS.endEvent = function() {
-    console.log('end');
     this.endAction();
 };
 
@@ -953,6 +951,7 @@ BattleManagerTS.checkBattleEnd = function() {
 
 BattleManagerTS.processVictory = function() {
     $gameParty.setupTS($gamePartyTS.battlerMembers());
+    $gameTroop.setupTS($gameTroopTS.battlerMembers());
     $gameParty.removeBattleStates();
     $gameParty.performVictory();
     this.playVictoryMe();
