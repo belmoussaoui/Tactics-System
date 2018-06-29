@@ -41,7 +41,7 @@
  * @help
  *
  * For more information, please consult :
- *   - https//:forums.rpgmakerweb.com/index.php?threads/tactics-system-ignis
+ *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system-ignis.97023/
  * Plugin Command:
  *   StartBattleTS          # Start battle scene
  */
@@ -266,7 +266,7 @@ Scene_BattleTS.prototype.isMapTouchOk = function() {
 };
 
 Scene_BattleTS.prototype.processMapTouch = function() {
-    if (TouchInput.isTriggered()) {// || this._touchCount > 0) {
+    if (TouchInput.isTriggered()) {
         var x = $gameMap.canvasToMapX(TouchInput.x);
         var y = $gameMap.canvasToMapY(TouchInput.y);
         $gameTemp.setDestination(x, y);
@@ -386,7 +386,6 @@ Scene_BattleTS.prototype.onEventOk = function() {
     var event = this._eventWindow.target();
     event.start();
     BattleManagerTS.startEvent();
-    //BattleManagerTS.endAction()
     this._eventWindow.hide();
     this._actorCommandWindow.close();
 };
@@ -449,7 +448,6 @@ Scene_BattleTS.prototype.endCommandSelection = function() {
     this._actorCommandWindow.close();
 };
 
-
 Scene_BattleTS.prototype.stop = function() {
     Scene_Base.prototype.stop.call(this);
     if (this.needsSlowFadeOut()) {
@@ -511,6 +509,10 @@ BattleManagerTS.setLogWindow = function(logWindow) {
 
 BattleManagerTS.setSpriteset = function(spriteset) {
     this._spriteset = spriteset;
+};
+
+BattleManagerTS.subjectTS = function() {
+    return this._subject;
 };
 
 BattleManagerTS.subject = function() {
@@ -1195,7 +1197,6 @@ Game_SelectorTS.prototype.update = function(active) {
         this.moveByDestination();
         this.updateScroll();
         this.updateWait();
-        //this.updateAction();
     }
 };
 
@@ -1241,16 +1242,16 @@ Game_SelectorTS.prototype.moveByDestination = function() {
 
 Game_SelectorTS.prototype.findDirectionTo = function(x, y) {
     if (this.y < y) {
-        return 2
+        return 2;
     }
     if (this.x > x) {
-        return 4
+        return 4;
     }
     if (this.x < x) {
-        return 6
+        return 6;
     }
     if (this.y > y) {
-        return 8
+        return 8;
     }
     return 0;
 };
@@ -2221,7 +2222,7 @@ Window_BattleEventTS.prototype.drawItem = function(index) {
 
 
 Window_BattleEventTS.prototype.refresh = function() {
-    var subject = BattleManagerTS._subject;
+    var subject = BattleManagerTS.subjectTS();
     if (subject) {
         this._actions = subject.actions();
     }
@@ -2580,7 +2581,7 @@ Game_Troop.prototype.increaseTurn = function() {
 
 Game_CharacterBase.prototype.isCollidedWithEvents = function(x, y) {
     // for an character to pass through an actor
-    // it's used to calculate the shortest path !
+    // it's used to calculate the shortest path
     var events = $gameMap.eventsXyNt(x, y);
     return events.some(function(event) {
         var dataEvent = $dataMap.events[event.eventId()];
@@ -2622,11 +2623,11 @@ Game_Event.prototype.name = function() {
 };
 
 Game_Event.prototype.isActorTS = function() {
-    return parseInt(this.event().meta['actor']) > 0
+    return parseInt(this.event().meta['actor']) > 0;
 };
 
 Game_Event.prototype.isEnemyTS = function() {
-    return parseInt(this.event().meta['enemy']) > 0
+    return parseInt(this.event().meta['enemy']) > 0;
 };
 
 var Game_Interpreter_updateWaitModeTS = Game_Interpreter.prototype.updateWaitMode;
@@ -2661,7 +2662,6 @@ Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, 
 Sprite_Character.prototype.character = function() {
     return this._character;
 };
-
 
 (function() {
     var Game_Interpreter_pluginCommandTS = Game_Interpreter.prototype.pluginCommand;
