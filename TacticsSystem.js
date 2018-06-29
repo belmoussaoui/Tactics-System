@@ -49,14 +49,14 @@
 var TacticsSystem = TacticsSystem || {};
 TacticsSystem.Parameters = PluginManager.parameters('TacticsSystem');
 
-TacticsSystem.cursorSpeed =          Number(TacticsSystem.Parameters['cursor speed']);
-TacticsSystem.gridOpacity =          Number(TacticsSystem.Parameters['grid opacity']);
-TacticsSystem.movePoints =           Number(TacticsSystem.Parameters['move points']);
-TacticsSystem.actionRange =          String(TacticsSystem.Parameters['action range']);
-TacticsSystem.moveScopeColor =       String(TacticsSystem.Parameters['move scope color']);
-TacticsSystem.allyScopeColor =       String(TacticsSystem.Parameters['ally scope color']);
-TacticsSystem.enemyScopeColor =      String(TacticsSystem.Parameters['enemy scope color']);
-TacticsSystem.animationIdOfDeath =   String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.cursorSpeed =        Number(TacticsSystem.Parameters['cursor speed']);
+TacticsSystem.gridOpacity =        Number(TacticsSystem.Parameters['grid opacity']);
+TacticsSystem.movePoints =         Number(TacticsSystem.Parameters['move points']);
+TacticsSystem.actionRange =        String(TacticsSystem.Parameters['action range']);
+TacticsSystem.moveScopeColor =     String(TacticsSystem.Parameters['move scope color']);
+TacticsSystem.allyScopeColor =     String(TacticsSystem.Parameters['ally scope color']);
+TacticsSystem.enemyScopeColor =    String(TacticsSystem.Parameters['enemy scope color']);
+TacticsSystem.animationIdOfDeath = String(TacticsSystem.Parameters['animationId of death']);
 
 //-----------------------------------------------------------------------------
 // Scene_BattleTS
