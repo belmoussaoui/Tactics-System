@@ -1778,6 +1778,15 @@ Game_UnitTS.prototype.getBattlerTS = function(battler) {
     }
 };
 
+Game_UnitTS.prototype.getBattler = function(event) {
+    for (var i = 0; i < this.members().length; i++) {
+        var member = this.members()[i];
+        if (member.event() === event) {
+            return member.battler();
+        }
+    }
+};
+
 //-----------------------------------------------------------------------------
 // Game_PartyTS
 //
@@ -2304,7 +2313,13 @@ Spriteset_MapTS.prototype.initialize = function() {
 Spriteset_MapTS.prototype.createCharacters = function() {
     this._characterSprites = [];
     $gameMap.events().forEach(function(event) {
-        this._characterSprites.push(new Sprite_Character(event));
+        var sprite = null;
+        if (event.isActorTS() || event.isEnemyTS()) {
+            sprite = new Sprite_BattlerTS(event);
+        } else {
+            sprite = new Sprite_Character(event);
+        }
+        this._characterSprites.push(sprite);
     }, this);
     for (var i = 0; i < this._characterSprites.length; i++) {
         this._tilemap.addChild(this._characterSprites[i]);
@@ -2394,8 +2409,9 @@ Spriteset_MapTS.prototype.createGrid = function() {
             square.bitmap = bitmap = new Bitmap(48, 48);
             square.bitmap._context.rect(0, 0, 48, 48);
             square.bitmap._context.stroke();
+            square.z = 1;
             square.opacity = TacticsSystem.gridOpacity || 120;
-            this.addChild(square);
+            this._tilemap.addChild(square);
         }
     }
 };
@@ -2426,6 +2442,70 @@ Spriteset_MapTS.prototype.isAnyoneMoving = function() {
 
 Spriteset_MapTS.prototype.isEffecting = function() {
     return false;
+};
+
+//-----------------------------------------------------------------------------
+// Sprite_BattlerTS
+//
+// The sprite for displaying a battler.
+
+function Sprite_BattlerTS() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_BattlerTS.prototype = Object.create(Sprite_Character.prototype);
+Sprite_BattlerTS.prototype.constructor = Sprite_BattlerTS;
+
+Sprite_BattlerTS.prototype.initialize = function(character) {
+    Sprite_Character.prototype.initialize.call(this, character);
+    this._damages = [];
+    this.setBattler(character.battlerTS());
+};
+
+Sprite_BattlerTS.prototype.setBattler = function(battler) {
+    this._battler = battler;
+};
+
+Sprite_BattlerTS.prototype.update = function() {
+    Sprite_Character.prototype.update.call(this);
+    this.updateDamagePopup();
+};
+
+Sprite_BattlerTS.prototype.updateDamagePopup = function() {
+    this.setupDamagePopup();
+    if (this._damages.length > 0) {
+        for (var i = 0; i < this._damages.length; i++) {
+            this._damages[i].update();
+        }
+        if (!this._damages[0].isPlaying()) {
+            this.parent.removeChild(this._damages[0]);
+            this._damages.shift();
+        }
+    }
+};
+
+Sprite_BattlerTS.prototype.setupDamagePopup = function() {
+    if (this._battler.isDamagePopupRequested()) {
+        if (this._battler.isSpriteVisible()) {
+            var sprite = new Sprite_Damage();
+            sprite.x = this.x + this.damageOffsetX();
+            sprite.y = this.y + this.damageOffsetY();
+            sprite.z = this.z + 1;
+            sprite.setup(this._battler);
+            this._damages.push(sprite);
+            this.parent.addChild(sprite);
+        }
+        this._battler.clearDamagePopup();
+        this._battler.clearResult();
+    }
+};
+
+Sprite_BattlerTS.prototype.damageOffsetX = function() {
+    return 24;
+};
+
+Sprite_BattlerTS.prototype.damageOffsetY = function() {
+    return 24;
 };
 
 //-----------------------------------------------------------------------------
@@ -2536,6 +2616,10 @@ Game_Actor.prototype.friendsUnitTS = function() {
     return $gamePartyTS;
 };
 
+Game_Actor.prototype.isSpriteVisible = function() {
+    return $gameSystem.isSideView() || $gameParty.inBattleTS();
+};
+
 Game_Enemy.prototype.friendsUnitTS = function() {
     return $gameTroopTS;
 };
@@ -2628,6 +2712,10 @@ Game_Event.prototype.isActorTS = function() {
 
 Game_Event.prototype.isEnemyTS = function() {
     return parseInt(this.event().meta['enemy']) > 0;
+};
+
+Game_Event.prototype.battlerTS = function() {
+    return this.isActorTS() ? $gamePartyTS.getBattler(this) : $gameTroopTS.getBattler(this);;
 };
 
 var Game_Interpreter_updateWaitModeTS = Game_Interpreter.prototype.updateWaitMode;
