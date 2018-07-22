@@ -2628,8 +2628,8 @@ Game_Action.prototype.getWeaponRange = function(actor) {
     if (typeof weapon === 'undefined') {
         data = this.getSkillRange();
     } else {
-        data = weapon.meta('range');
-        if (typeof weapon === 'undefined') {
+        data = weapon.meta['range'];
+        if (typeof data === 'undefined') {
             data = this.getSkillRange();
         }
     }
