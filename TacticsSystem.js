@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.1 [Ignis]
+// TacticsSystem.js v0.2.1 [Ignis]
 //=============================================================================
 
 /*:
@@ -12,7 +12,7 @@
  *
  * @param grid opacity
  * @desc The grid opacity of the battle scene.
- * @default 120
+ * @default 40
  *
  * @param move points
  * @desc The movement distance of a unit.
@@ -288,7 +288,6 @@ Scene_BattleTS.prototype.commandAttack = function() {
 Scene_BattleTS.prototype.commandSkill = function() {
     this._skillWindow.setActor(BattleManagerTS.subject());
     this._skillWindow.setStypeId(this._actorCommandWindow.currentExt());
-    this._skillWindow.refresh();
     this._skillWindow.show();
     this._skillWindow.activate();
 };
@@ -834,7 +833,7 @@ BattleManagerTS.invokeCounterAttack = function(subject, target) {
     action.setAttack();
     action.apply(subject);
     this._logWindow.displayCounter(target);
-    this._logWindow.displayCounterResults(subject, subject);
+    this._logWindow.displayActionResults(target, subject);
 };
 
 BattleManagerTS.invokeMagicReflection = function(subject, target) {
@@ -1882,7 +1881,7 @@ Game_TroopTS.prototype.onBattleStart = function() {
 };
 
 //-----------------------------------------------------------------------------
-// Window_ActorCommand
+// Window_ActorCommandTS
 //
 // The window for selecting an actor's action on the battle screen.
 
@@ -1895,6 +1894,14 @@ Window_ActorCommandTS.prototype.constructor = Window_ActorCommandTS;
 
 Window_ActorCommandTS.prototype.initialize = function() {
     Window_ActorCommand.prototype.initialize.call(this);
+};
+
+Window_ActorCommandTS.prototype.setup = function(actor) {
+    this._actor = actor;
+    this.refresh();
+    this.selectLast();
+    this.activate();
+    this.open();
 };
 
 Window_ActorCommandTS.prototype.makeCommandList = function() {
@@ -2290,6 +2297,52 @@ Sprite_CellTS.prototype.update = function() {
 };
 
 //-----------------------------------------------------------------------------
+// Sprite_GridTS
+//
+// The sprite for displaying a grid.
+
+function Sprite_GridTS() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_GridTS.prototype = Object.create(Sprite_Base.prototype);
+Sprite_GridTS.prototype.constructor = Sprite_GridTS;
+
+Sprite_GridTS.prototype.initialize = function() {
+    Sprite_Base.prototype.initialize.call(this);
+    this.setFrame(0, 0, Graphics.width, Graphics.height);
+    this.createBitmap();
+    this.z = 1;
+    this.opacity = TacticsSystem.gridOpacity || 60;
+};
+
+Sprite_GridTS.prototype.createBitmap = function() {
+    var width = $gameMap.width();
+    var height = $gameMap.height();
+    this.bitmap = new Bitmap(width * 48, height * 48);
+     for (var x = 0; x < width; x++) {
+        for (var y = 0; y < height; y++) {
+            var context = this.bitmap._context;
+            var w = x * 48;
+            var h = y * 48;
+            context.rect(w, h, w + 48, h + 48);
+            context.stroke();
+        }
+    }
+};
+
+Sprite_GridTS.prototype.update = function() {
+    Sprite_Base.prototype.update.call(this);
+    var screen = $gameScreen;
+    var scale = screen.zoomScale();
+    this.scale.x = scale;
+    this.scale.y = scale;
+    this.x = Math.round($gameMap.adjustX(0) * 48);
+    this.y = Math.round($gameMap.adjustY(0) * 48);
+    this.x += Math.round(screen.shake());
+};
+
+//-----------------------------------------------------------------------------
 // Spriteset_MapTS
 //
 // The sprite for displaying a selector.
@@ -2403,17 +2456,7 @@ Spriteset_MapTS.prototype.createColorCell = function(x, y, color) {
 };
 
 Spriteset_MapTS.prototype.createGrid = function() {
-    for (var x = 0; x < $gameMap.width(); x++) {
-        for (var y = 0; y < $gameMap.height(); y++) {
-            square = new Sprite_CellTS(x, y);
-            square.bitmap = bitmap = new Bitmap(48, 48);
-            square.bitmap._context.rect(0, 0, 48, 48);
-            square.bitmap._context.stroke();
-            square.z = 1;
-            square.opacity = TacticsSystem.gridOpacity || 120;
-            this._tilemap.addChild(square);
-        }
-    }
+    this._tilemap.addChild(new Sprite_GridTS());
 };
 
 Spriteset_MapTS.prototype.isBusy = function() {
@@ -2567,21 +2610,38 @@ Game_Action.prototype.searchBattlers = function(subject, units) {
 };
 
 Game_Action.prototype.createRange = function(subject) {
-    var object = this.item();
-    var data = object.meta['range'];
-    if (typeof data === 'undefined') {
-        data = TacticsSystem.actionRange || '[x + 1, y],[x - 1, y],[x, y + 1],[x, y - 1]';
-    }
-    if (object.scope === 11) {
-        data = '[x, y]';
-    }
-    if (object.scope === 7 || object.scope === 8) { 
-        data = '[x, y],' + data;
+    var data = '';
+    if (this.isAttack() && subject.isActor()) {
+        data = this.getWeaponRange(subject.battler());
+    } else {
+        data = this.getSkillRange();
     }
     var x = subject.x;
     var y = subject.y;
     var range = eval('[' + data + ']');
     this._range = range;
+};
+
+Game_Action.prototype.getWeaponRange = function(actor) {
+    var data = actor.weapons()[0].meta['range'];
+    if (typeof data === 'undefined') {
+        data = this.getSkillRange();
+    }
+    return data;
+};
+
+Game_Action.prototype.getSkillRange = function(subject) {
+    var data = this.item().meta['range'];
+    if (typeof data === 'undefined') {
+        data = TacticsSystem.actionRange;
+    }
+    if (this.isForFriend()) {
+        data = '[x, y],' + data;
+    }
+    if (this.isForUser()) {
+        data = '[x, y]';
+    }
+    return data;
 };
 
 Game_Action.prototype.range = function() {
@@ -2592,7 +2652,7 @@ var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
 Game_BattlerBase.prototype.canUse = function(item) {
     if ($gameParty.inBattleTS()) {
         if (!this.isItemRangeValid(item)) {
-            return false
+            return false;
         }
     }
     return Game_BattlerBase_canUseTS.call(this, item);
