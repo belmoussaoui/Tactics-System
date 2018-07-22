@@ -2623,9 +2623,15 @@ Game_Action.prototype.createRange = function(subject) {
 };
 
 Game_Action.prototype.getWeaponRange = function(actor) {
-    var data = actor.weapons()[0].meta['range'];
-    if (typeof data === 'undefined') {
+    var data = '';
+    var weapon = actor.weapons()[0];
+    if (typeof weapon === 'undefined') {
         data = this.getSkillRange();
+    } else {
+        data = weapon.meta('range');
+        if (typeof weapon === 'undefined') {
+            data = this.getSkillRange();
+        }
     }
     return data;
 };
