@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.2.1 [Ignis]
+// TacticsSystem.js v0.2.2 [Ignis]
 //=============================================================================
 
 /*:
@@ -288,6 +288,7 @@ Scene_BattleTS.prototype.commandAttack = function() {
 Scene_BattleTS.prototype.commandSkill = function() {
     this._skillWindow.setActor(BattleManagerTS.subject());
     this._skillWindow.setStypeId(this._actorCommandWindow.currentExt());
+    this._skillWindow.refresh();
     this._skillWindow.show();
     this._skillWindow.activate();
 };
@@ -641,10 +642,8 @@ BattleManagerTS.startTurn = function() {
     $gameTroop.increaseTurn();
     $gameTroopTS.onTurnStart();
     $gamePartyTS.onTurnStart();
+    $gameSelectorTS.restorePosition();
     this._logWindow.startTurn();
-    if (this._turn !== 1) {
-        $gameSelectorTS.restorePosition();
-    }
     this.startPlayerPhase();
 };
 
@@ -712,7 +711,7 @@ BattleManagerTS.inputtingAction = function() {
 
 BattleManagerTS.endPlayerPhase = function() {
     $gameSelectorTS.savePosition();
-    $gamePartyTS.onTurnEnd();
+    $gameTroopTS.onTurnEnd();
     this.startEnemyPhase();
 };
 
@@ -733,15 +732,9 @@ BattleManagerTS.updateEnemyPhase = function() {
     this._subject = this.getNextEnemy();
     $gameTroop.setupTS([this.subject()]);
     this._subject.updateBlueCells();
-    var pos = this._subject.makeMove();
-    var x = pos[0];
-    var y = pos[1];
-    if (x != this._subject.x || y != this._subject.y) {
-        $gameSelectorTS.performTransfer(pos[0], pos[1]);
-        this._phase = 'move';
-    } else {
-        this.setupAction();
-    }
+    var pos = this._subject.findBestMove();
+    $gameSelectorTS.performTransfer(pos[0], pos[1]);
+    this._phase = 'move';
 };
 
 BattleManagerTS.setupAction = function() {
@@ -758,7 +751,7 @@ BattleManagerTS.getNextEnemy = function() {
 };
 
 BattleManagerTS.endEnemyPhase = function() {
-    $gameTroopTS.onTurnEnd();
+    $gamePartyTS.onTurnEnd();
     this.endTurn();
 };
 
@@ -886,7 +879,6 @@ BattleManagerTS.startEvent = function() {
     this._phase = 'event';
 };
 
-
 BattleManagerTS.endEvent = function() {
     this.endAction();
 };
@@ -921,7 +913,6 @@ BattleManagerTS.processCancel = function() {
     this._spriteset.removeRedCells();
     $gameSelectorTS.performTransfer(this._subject.x, this._subject.y);
 };
-
 
 BattleManagerTS.performTransfer = function(battler) {
     $gameSelectorTS.performTransfer(battler.x, battler.y);
@@ -1151,9 +1142,11 @@ Game_SelectorTS.prototype.initialize = function() {
 Game_SelectorTS.prototype.initMembers = function() {
     this._x = 0;
     this._y = 0;
+    this._realX = 0;
+    this._realY = 0;
+    this._oldX = null;
+    this._oldY = null;
     this._direction = 0;
-    this._oldX = 0;
-    this._oldY = 0;
     this._speed = TacticsSystem.cursorSpeed + 3 || 5;
     this._wait = 0;
     this._select = null;
@@ -1170,8 +1163,8 @@ Game_SelectorTS.prototype.pos = function(x, y) {
 };
 
 Game_SelectorTS.prototype.setPosition = function(x, y) {
-    this._x = x;
-    this._y = y;
+    this._realX = this._x = x;
+    this._realY = this._y = y;
 };
 
 Game_SelectorTS.prototype.isWaiting = function() {
@@ -1192,16 +1185,23 @@ Game_SelectorTS.prototype.getInputDirection = function() {
 
 Game_SelectorTS.prototype.update = function(active) {
     if (active) {
+        var scrolledX = this.scrolledX();
+        var scrolledY = this.scrolledY();
         this.moveByInput();
         this.moveByDestination();
-        this.updateScroll();
+        this.updateMove();
+        this.updateScroll(scrolledX, scrolledY);
         this.updateWait();
     }
 };
 
+Game_SelectorTS.prototype.distancePerFrame = function() {
+    return Math.pow(2, this._speed) / 256;
+};
+
 Game_SelectorTS.prototype.updateWait = function() {
     if (this.isWaiting()) {
-        this._wait -= Math.pow(2, this._speed) / 256;
+        this._wait -= this.distancePerFrame();
     }
 };
 
@@ -1264,8 +1264,8 @@ Game_SelectorTS.prototype.executeMove = function(x, y, direction) {
 };
 
 Game_SelectorTS.prototype.performTransfer = function(x, y) {
-    this._x = x;
-    this._y = y;
+    this._realX = this._x = x;
+    this._realY = this._y = y;
     this._hadMoved = true;
     $gameMap.setDisplayPos(x - this.centerX(), y - this.centerY());
     this.updateSelect();
@@ -1273,6 +1273,21 @@ Game_SelectorTS.prototype.performTransfer = function(x, y) {
 
 Game_SelectorTS.prototype.isValid = function(x, y) {
     return x >= 0 && y >= 0 && x < $gameMap.width() && y < $gameMap.height();
+};
+
+Game_SelectorTS.prototype.updateMove = function() {
+    if (this._x < this._realX) {
+        this._realX = Math.max(this._realX - this.distancePerFrame(), this._x);
+    }
+    if (this._x > this._realX) {
+        this._realX = Math.min(this._realX + this.distancePerFrame(), this._x);
+    }
+    if (this._y < this._realY) {
+        this._realY = Math.max(this._realY - this.distancePerFrame(), this._y);
+    }
+    if (this._y > this._realY) {
+        this._realY = Math.min(this._realY + this.distancePerFrame(), this._y);
+    }
 };
 
 Game_SelectorTS.prototype.updateSelect = function() {
@@ -1288,21 +1303,23 @@ Game_SelectorTS.prototype.isOnData = function(data) {
     return this.pos(data.x, data.y);
 };
 
-Game_SelectorTS.prototype.updateScroll = function() {
-    if (this._direction === 2 && this.y > this.centerY()) {
-        $gameMap.startScroll(2, 1, this._speed);
+Game_SelectorTS.prototype.updateScroll = function(lastScrolledX, lastScrolledY) {
+    var x1 = lastScrolledX;
+    var y1 = lastScrolledY;
+    var x2 = this.scrolledX();
+    var y2 = this.scrolledY();
+    if (y2 > y1 && y2 > this.centerY()) {
+        $gameMap.scrollDown(y2 - y1);
     }
-    if (this._direction === 4 && this.x < $gameMap.width() - 1 - this.centerX()) {
-        $gameMap.startScroll(4, 1, this._speed);
+    if (x2 < x1 && x2 < this.centerX()) {
+        $gameMap.scrollLeft(x1 - x2);
     }
-    if (this._direction === 6 && this.x > this.centerX()) {
-        $gameMap.startScroll(6, 1, this._speed);
+    if (x2 > x1 && x2 > this.centerX()) {
+        $gameMap.scrollRight(x2 - x1);
     }
-    if (this._direction === 8 && this.y < $gameMap.height() - 1 - this.centerY()) {
-        $gameMap.startScroll(8, 1, this._speed);
+    if (y2 < y1 && y2 < this.centerY()) {
+        $gameMap.scrollUp(y1 - y2);
     }
-    this._direction = 0;
-    $gameMap.updateScroll();
 };
 
 Game_SelectorTS.prototype.centerX = function() {
@@ -1323,25 +1340,31 @@ Game_SelectorTS.prototype.savePosition = function() {
 };
 
 Game_SelectorTS.prototype.restorePosition = function() {
-    this.performTransfer(this._oldX, this._oldY);
+    if (this.isRestorationValid()) {
+        this.performTransfer(this._oldX, this._oldY);
+    }
+};
+
+Game_SelectorTS.prototype.isRestorationValid = function() {
+    return this._oldX !== null && this._oldY !== null;
 };
 
 Game_SelectorTS.prototype.scrolledX = function() {
-    return $gameMap.adjustX(this.x);
+    return $gameMap.adjustX(this._realX);
 };
 
 Game_SelectorTS.prototype.scrolledY = function() {
-    return $gameMap.adjustY(this.y);
+    return $gameMap.adjustY(this._realY);
 };
 
 Game_SelectorTS.prototype.screenX = function() {
     var tw = $gameMap.tileWidth();
-    return Math.round(this.scrolledX() * tw);
+    return Math.round($gameMap.adjustX(this.x) * tw);
 };
 
 Game_SelectorTS.prototype.screenY = function() {
     var th = $gameMap.tileHeight();
-    return Math.round(this.scrolledY() * th);
+    return Math.round($gameMap.adjustY(this.y) * th);
 };
 
 Game_SelectorTS.prototype.triggerTouchAction = function() {
@@ -1667,7 +1690,7 @@ Game_EnemyTS.prototype.friendsUnit = function() {
     return $gameTroopTS;
 };
 
-Game_EnemyTS.prototype.makeAllMoves = function() {
+Game_EnemyTS.prototype.findBestMove = function() {
     var rate = 0;
     var x = this.x;
     var y = this.y;
@@ -1690,10 +1713,6 @@ Game_EnemyTS.prototype.makeAllMoves = function() {
     this._x = x;
     this._y = y;
     return pos;
-};
-
-Game_EnemyTS.prototype.makeMove = function(movesList) {
-    return this.makeAllMoves();
 };
 
 //-----------------------------------------------------------------------------
@@ -2362,7 +2381,6 @@ Spriteset_MapTS.prototype.initialize = function() {
     this._redCells = [];
 };
 
-
 Spriteset_MapTS.prototype.createCharacters = function() {
     this._characterSprites = [];
     $gameMap.events().forEach(function(event) {
@@ -2427,7 +2445,7 @@ Spriteset_MapTS.prototype.createRedCells = function(action) {
     for (var i = 0; i < range.length; i++) {
         var x = range[i][0];
         var y = range[i][1];
-        var color = ''
+        var color = '';
         if (action.isForFriend()) {
             color = TacticsSystem.allyScopeColor || '#008000';
         } else {
@@ -2658,6 +2676,7 @@ var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
 Game_BattlerBase.prototype.canUse = function(item) {
     if ($gameParty.inBattleTS()) {
         if (!this.isItemRangeValid(item)) {
+            console.log(item);
             return false;
         }
     }
