@@ -1,10 +1,10 @@
 //=============================================================================
-// TacticsSystem.js v0.2.2 [Ignis]
+// TacticsSystem.js v0.3 [Ignis]
 //=============================================================================
 
 /*:
  * @plugindesc A Tactical Battle System like Final Fantasy Tactics or Fire Emblem series.
- * @author El Moussaoui Bilal (embxii_)
+ * @author El Moussaoui Bilal (https://twitter.com/embxii_)
  *
  * @param cursor speed
  * @desc The cursor speed. 1: Slow, 2: Normal, 3: Fast
@@ -711,7 +711,12 @@ BattleManagerTS.inputtingAction = function() {
 
 BattleManagerTS.endPlayerPhase = function() {
     $gameSelectorTS.savePosition();
-    $gameTroopTS.onTurnEnd();
+    $gameTroopTS.members().forEach(function(enemyTS) {
+        enemyTS.onTurnEnd();
+        var enemy = enemyTS.battler();
+        this._logWindow.displayAutoAffectedStatus(enemy);
+        this._logWindow.displayRegeneration(enemy);
+    }, this);
     this.startEnemyPhase();
 };
 
@@ -751,7 +756,12 @@ BattleManagerTS.getNextEnemy = function() {
 };
 
 BattleManagerTS.endEnemyPhase = function() {
-    $gamePartyTS.onTurnEnd();
+    $gamePartyTS.members().forEach(function(actorTS) {
+        actorTS.onTurnEnd();
+        var actor = actorTS.battler();
+        this._logWindow.displayAutoAffectedStatus(actor);
+        this._logWindow.displayRegeneration(actor);
+    }, this);
     this.endTurn();
 };
 
@@ -853,7 +863,7 @@ BattleManagerTS.checkSubstitute = function(target) {
 BattleManagerTS.endAction = function() {
     this._spriteset.removeRedCells();
     this._logWindow.endAction(this.subject());
-    this.endBattlePhase();
+    this.processAction();
 };
 
 BattleManagerTS.endBattlePhase = function() {
@@ -1240,7 +1250,7 @@ Game_SelectorTS.prototype.moveByDestination = function() {
 };
 
 Game_SelectorTS.prototype.findDirectionTo = function(x, y) {
-    if (this.y < y) {
+    if (this.y < y) {
         return 2;
     }
     if (this.x > x) {
@@ -1755,12 +1765,6 @@ Game_UnitTS.prototype.onTurnStart = function() {
     });
 };
 
-Game_UnitTS.prototype.onTurnEnd = function() {
-    this.members().forEach(function(member) {
-        member.onTurnEnd();
-    });
-};
-
 Game_UnitTS.prototype.makeActions = function() {
     this.members().forEach(function(member) {
         member.makeActions();
@@ -1861,7 +1865,7 @@ Game_PartyTS.prototype.maxBattleMembers = function() {
     return this._maxBattleMembers;
 };
 
-Game_PartyTS.prototype.setBattleMembers= function(number) {
+Game_PartyTS.prototype.setBattleMembers = function(number) {
     this._maxBattleMembers = number;
 };
 
@@ -2521,6 +2525,24 @@ Sprite_BattlerTS.prototype.initialize = function(character) {
     Sprite_Character.prototype.initialize.call(this, character);
     this._damages = [];
     this.setBattler(character.battlerTS());
+    this.createHpGaugeSprite();
+    this.createStateIconSprite();
+};
+
+Sprite_BattlerTS.prototype.createHpGaugeSprite = function() {
+    this._hpGaugeSprite = new Sprite_HpGaugeTS(this._battler);
+    this._hpGaugeSprite.z = this.z;
+    this.addChild(this._hpGaugeSprite);
+};
+
+Sprite_BattlerTS.prototype.createStateIconSprite = function() {
+    this._stateIconSprite = new Sprite_StateIcon();
+    this._stateIconSprite.setup(this._battler);
+    this._stateIconSprite.x = 15;
+    this._stateIconSprite.z = this.z;
+    this._stateIconSprite.scale.x = 0.6;
+    this._stateIconSprite.scale.y = 0.6;
+    this.addChild(this._stateIconSprite);
 };
 
 Sprite_BattlerTS.prototype.setBattler = function(battler) {
@@ -2567,6 +2589,74 @@ Sprite_BattlerTS.prototype.damageOffsetX = function() {
 
 Sprite_BattlerTS.prototype.damageOffsetY = function() {
     return 24;
+};
+
+//-----------------------------------------------------------------------------
+// Sprite_HpGaugeTS
+//
+// The sprite for displaying the hp gauge.
+
+function Sprite_HpGaugeTS() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_HpGaugeTS.prototype = Object.create(Sprite_Base.prototype);
+Sprite_HpGaugeTS.prototype.constructor = Sprite_HpGaugeTS;
+
+Sprite_HpGaugeTS.prototype.initialize = function(battler) {
+    Sprite_Base.prototype.initialize.call(this);
+    this.bitmap = new Bitmap(40, 4);
+    this.windowskin = ImageManager.loadSystem('Window');
+    this.anchor.x = 0.5;
+    this.anchor.y = 0;
+    this._battler = battler;
+};
+
+Sprite_HpGaugeTS.prototype.gaugeBackColor = function() {
+    return this.textColor(19);
+};
+
+Sprite_HpGaugeTS.prototype.hpGaugeColor1 = function() {
+    return this.textColor(20);
+};
+
+Sprite_HpGaugeTS.prototype.hpGaugeColor2 = function() {
+    return this.textColor(21);
+};
+
+Sprite_HpGaugeTS.prototype.textColor = function(n) {
+    var px = 96 + (n % 8) * 12 + 6;
+    var py = 144 + Math.floor (n / 8) * 12 + 6;
+    return this.windowskin.getPixel(px, py);
+};
+
+Sprite_HpGaugeTS.prototype.update = function(battler) {
+    Sprite_Base.prototype.update.call(this);
+    this.bitmap.clear();
+    if (this._battler.isAlive()) {
+        this.drawBattlerHP();
+       // this.drawBattlerState();
+    }
+};
+
+Sprite_HpGaugeTS.prototype.drawBattlerHP = function() {
+    var width = 40;
+    var color1 = this.hpGaugeColor1();
+    var color2 = this.hpGaugeColor2();
+    this.drawGauge(0, 0, width, this._battler.hpRate(), color1, color2)
+};
+
+Sprite_HpGaugeTS.prototype.drawGauge = function(x, y, width, rate, color1, color2) {
+    var fillW = Math.floor(width * rate);
+    this.bitmap.fillRect(x, y, width, 4, this.gaugeBackColor());
+    this.bitmap.gradientFillRect(x, y, fillW, 4, color1, color2);
+};
+
+Sprite_HpGaugeTS.prototype.drawBattlerState = function() {
+    var width = 40;
+    var color1 = this.hpGaugeColor1();
+    var color2 = this.hpGaugeColor2();
+    this.drawIcon(0, 0, width, this._battler.hpRate(), color1, color2)
 };
 
 //-----------------------------------------------------------------------------
