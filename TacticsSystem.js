@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.3 [Ignis]
+// TacticsSystem.js v0.3
 //=============================================================================
 
 /*:
@@ -12,7 +12,7 @@
  *
  * @param grid opacity
  * @desc The grid opacity of the battle scene.
- * @default 40
+ * @default 30
  *
  * @param move points
  * @desc The movement distance of a unit.
@@ -38,10 +38,18 @@
  * @desc The animation for the death of a unit.
  * @default 97
  *
+ * @param show hp gauge
+ * @desc Show the hp gauge below the unit. 0: False, 1: True
+ * @default 1
+ *
+ * @param show state icon
+ * @desc Show the icon state of a unit. 0: False, 1: True
+ * @default 1
+ *
  * @help
  *
  * For more information, please consult :
- *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system-ignis.97023/
+ *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system.97023/
  * Plugin Command:
  *   StartBattleTS          # Start battle scene
  */
@@ -57,6 +65,10 @@ TacticsSystem.moveScopeColor =     String(TacticsSystem.Parameters['move scope c
 TacticsSystem.allyScopeColor =     String(TacticsSystem.Parameters['ally scope color']);
 TacticsSystem.enemyScopeColor =    String(TacticsSystem.Parameters['enemy scope color']);
 TacticsSystem.animationIdOfDeath = String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.animationIdOfDeath = String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.animationIdOfDeath = String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.showHpGauge =        Number(TacticsSystem.Parameters['show hp gauge']);
+TacticsSystem.showStateIcon =      Number(TacticsSystem.Parameters['show state icon']);
 
 //-----------------------------------------------------------------------------
 // Scene_BattleTS
@@ -637,6 +649,11 @@ BattleManagerTS.preparation = function() {
     this.startTurn();
 };
 
+BattleManagerTS.selectNextCommand = function(member) {
+    this._subject = member;
+    this.setupAction();
+};
+
 BattleManagerTS.startTurn = function() {
     this._turn++;
     $gameTroop.increaseTurn();
@@ -648,6 +665,10 @@ BattleManagerTS.startTurn = function() {
 };
 
 BattleManagerTS.startPlayerPhase = function() {
+    var actor = $gamePartyTS.canNotInput()[0];
+    if (actor) {
+        this.selectNextCommand(actor);
+    }
     this._subject = null;
     $gameTroopTS.updateBlueCells();
     $gamePartyTS.updateBlueCells();
@@ -1389,6 +1410,11 @@ Game_SelectorTS.prototype.triggerTouchAction = function() {
     return false;
 };
 
+Game_SelectorTS.prototype.reset = function() {
+    this._oldX = null;
+    this._oldY = null;
+};
+
 //-----------------------------------------------------------------------------
 // Game_EventBattlerTS
 //
@@ -1537,8 +1563,12 @@ Game_EventBattlerTS.prototype.isActor = function() {
     return this.battler().isActor();
 };
 
-Game_EventBattlerTS.prototype.isAlive = function(item) {
+Game_EventBattlerTS.prototype.isAlive = function() {
     return this.battler().isAlive();
+};
+
+Game_EventBattlerTS.prototype.canInput = function() {
+    return this.battler().canInput();
 };
 
 Game_EventBattlerTS.prototype.opponentsUnit = function() {
@@ -1867,6 +1897,12 @@ Game_PartyTS.prototype.maxBattleMembers = function() {
 
 Game_PartyTS.prototype.setBattleMembers = function(number) {
     this._maxBattleMembers = number;
+};
+
+Game_PartyTS.prototype.canNotInput = function() {
+    return this.members().filter(function(member) {
+        return !member.canInput() && member.canPlay();
+    }, this);
 };
 
 //-----------------------------------------------------------------------------
@@ -2525,24 +2561,29 @@ Sprite_BattlerTS.prototype.initialize = function(character) {
     Sprite_Character.prototype.initialize.call(this, character);
     this._damages = [];
     this.setBattler(character.battlerTS());
-    this.createHpGaugeSprite();
-    this.createStateIconSprite();
+    if (TacticsSystem.showStateIcon) {
+        this.createStateIconSprite();
+    }
+    if (TacticsSystem.showHpGauge) {
+        this.createHpGaugeSprite();
+    }
+};
+
+Sprite_BattlerTS.prototype.createStateIconSprite = function() {
+    this._stateIconSprite = new Sprite_StateIcon();
+    this._stateIconSprite.setup(this._battler);
+    this._stateIconSprite.y = -5;
+    this._stateIconSprite.x = 15;
+    this._stateIconSprite.z = this.z;
+    this._stateIconSprite.scale.x = 0.6;
+    this._stateIconSprite.scale.y = 0.6;
+    this.addChild(this._stateIconSprite);
 };
 
 Sprite_BattlerTS.prototype.createHpGaugeSprite = function() {
     this._hpGaugeSprite = new Sprite_HpGaugeTS(this._battler);
     this._hpGaugeSprite.z = this.z;
     this.addChild(this._hpGaugeSprite);
-};
-
-Sprite_BattlerTS.prototype.createStateIconSprite = function() {
-    this._stateIconSprite = new Sprite_StateIcon();
-    this._stateIconSprite.setup(this._battler);
-    this._stateIconSprite.x = 15;
-    this._stateIconSprite.z = this.z;
-    this._stateIconSprite.scale.x = 0.6;
-    this._stateIconSprite.scale.y = 0.6;
-    this.addChild(this._stateIconSprite);
 };
 
 Sprite_BattlerTS.prototype.setBattler = function(battler) {
@@ -2766,7 +2807,6 @@ var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
 Game_BattlerBase.prototype.canUse = function(item) {
     if ($gameParty.inBattleTS()) {
         if (!this.isItemRangeValid(item)) {
-            console.log(item);
             return false;
         }
     }
