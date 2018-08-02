@@ -1830,11 +1830,11 @@ Game_UnitTS.prototype.getBattlerTS = function(battler) {
     }
 };
 
-Game_UnitTS.prototype.getBattler = function(event) {
+Game_UnitTS.prototype.getBattlerTSByEvent = function(event) {
     for (var i = 0; i < this.members().length; i++) {
         var member = this.members()[i];
         if (member.event() === event) {
-            return member.battler();
+            return member;
         }
     }
 };
@@ -2586,13 +2586,15 @@ Sprite_BattlerTS.prototype.createHpGaugeSprite = function() {
     this.addChild(this._hpGaugeSprite);
 };
 
-Sprite_BattlerTS.prototype.setBattler = function(battler) {
-    this._battler = battler;
+Sprite_BattlerTS.prototype.setBattler = function(battlerTS) {
+    this._battlerTS = battlerTS;
+    this._battler = battlerTS.battler();
 };
 
 Sprite_BattlerTS.prototype.update = function() {
     Sprite_Character.prototype.update.call(this);
     this.updateDamagePopup();
+    this.updateColor();
 };
 
 Sprite_BattlerTS.prototype.updateDamagePopup = function() {
@@ -2630,6 +2632,14 @@ Sprite_BattlerTS.prototype.damageOffsetX = function() {
 
 Sprite_BattlerTS.prototype.damageOffsetY = function() {
     return 24;
+};
+
+Sprite_BattlerTS.prototype.updateColor = function() {
+    if (this._battlerTS.canPlay()) {
+        this.setColorTone([0, 0, 0, 0]);
+    } else {
+        this.setColorTone([0, 0, 0, 255]);
+    }
 };
 
 //-----------------------------------------------------------------------------
@@ -2930,7 +2940,7 @@ Game_Event.prototype.isEnemyTS = function() {
 };
 
 Game_Event.prototype.battlerTS = function() {
-    return this.isActorTS() ? $gamePartyTS.getBattler(this) : $gameTroopTS.getBattler(this);;
+    return this.isActorTS() ? $gamePartyTS.getBattlerTSByEvent(this) : $gameTroopTS.getBattlerTSByEvent(this);
 };
 
 var Game_Interpreter_updateWaitModeTS = Game_Interpreter.prototype.updateWaitMode;
