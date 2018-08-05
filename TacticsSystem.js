@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.3
+// TacticsSystem.js v0.3.1
 //=============================================================================
 
 /*:
@@ -123,7 +123,6 @@ Scene_BattleTS.prototype.createAllWindows = function() {
     this.createEnemyWindow();
     this.createEventWindow();
     this.createMessageWindow();
-    //this.createScrollTextWindow();
 };
 
 Scene_BattleTS.prototype.createLogWindow = function() {
@@ -491,6 +490,7 @@ function BattleManagerTS() {
 
 BattleManagerTS.setup = function() {
     this.initMembers();
+    $gameTemp.clearPosition();
     $gameTroop.clear();
     $gameScreen.onBattleStart();
     $gamePartyTS.onBattleStart();
@@ -690,6 +690,7 @@ BattleManagerTS.updateExplore = function() {
     if (this.canSelectActor($gameSelectorTS.select())) {
         SoundManager.playOk();
         this._subject = $gameSelectorTS.select();
+        this._subject.savePosition();
         this._blueCells = this._subject.blueCells();
         $gameParty.setupTS([this._subject.battler()]);
         this._phase = 'playerSelect';
@@ -732,11 +733,11 @@ BattleManagerTS.inputtingAction = function() {
 
 BattleManagerTS.endPlayerPhase = function() {
     $gameSelectorTS.savePosition();
-    $gameTroopTS.members().forEach(function(enemyTS) {
-        enemyTS.onTurnEnd();
-        var enemy = enemyTS.battler();
-        this._logWindow.displayAutoAffectedStatus(enemy);
-        this._logWindow.displayRegeneration(enemy);
+    $gamePartyTS.members().forEach(function(actorTS) {
+        actorTS.onTurnEnd();
+        var actor = actorTS.battler();
+        this._logWindow.displayAutoAffectedStatus(actor);
+        this._logWindow.displayRegeneration(actor);
     }, this);
     this.startEnemyPhase();
 };
@@ -777,11 +778,11 @@ BattleManagerTS.getNextEnemy = function() {
 };
 
 BattleManagerTS.endEnemyPhase = function() {
-    $gamePartyTS.members().forEach(function(actorTS) {
-        actorTS.onTurnEnd();
-        var actor = actorTS.battler();
-        this._logWindow.displayAutoAffectedStatus(actor);
-        this._logWindow.displayRegeneration(actor);
+    $gameTroopTS.members().forEach(function(enemyTS) {
+        enemyTS.onTurnEnd();
+        var enemy = enemyTS.battler();
+        this._logWindow.displayAutoAffectedStatus(enemy);
+        this._logWindow.displayRegeneration(enemy);
     }, this);
     this.endTurn();
 };
@@ -1175,8 +1176,6 @@ Game_SelectorTS.prototype.initMembers = function() {
     this._y = 0;
     this._realX = 0;
     this._realY = 0;
-    this._oldX = null;
-    this._oldY = null;
     this._direction = 0;
     this._speed = TacticsSystem.cursorSpeed + 3 || 5;
     this._wait = 0;
@@ -1366,18 +1365,15 @@ Game_SelectorTS.prototype.moveTo = function(x, y) {
 };
 
 Game_SelectorTS.prototype.savePosition = function() {
-    this._oldX = this.x;
-    this._oldY = this.y;
+    $gameTemp.setPosition(this.x, this.y);
 };
 
 Game_SelectorTS.prototype.restorePosition = function() {
-    if (this.isRestorationValid()) {
-        this.performTransfer(this._oldX, this._oldY);
+    if ($gameTemp.isPositionValid()) {
+        var positionX = $gameTemp.positionX();
+        var positionY = $gameTemp.positionY();
+        this.performTransfer(positionX, positionY);
     }
-};
-
-Game_SelectorTS.prototype.isRestorationValid = function() {
-    return this._oldX !== null && this._oldY !== null;
 };
 
 Game_SelectorTS.prototype.scrolledX = function() {
@@ -1410,11 +1406,6 @@ Game_SelectorTS.prototype.triggerTouchAction = function() {
     return false;
 };
 
-Game_SelectorTS.prototype.reset = function() {
-    this._oldX = null;
-    this._oldY = null;
-};
-
 //-----------------------------------------------------------------------------
 // Game_EventBattlerTS
 //
@@ -1436,8 +1427,6 @@ Game_EventBattlerTS.prototype.initialize = function(x, y, eventId) {
     this.initMembers()
     this._x = x;
     this._y = y;
-    this._oldX = x;
-    this._oldY = y;
     this._event = $gameMap.event(eventId);
 };
 
@@ -1476,19 +1465,17 @@ Game_EventBattlerTS.prototype.isMoving = function() {
 };
 
 Game_EventBattlerTS.prototype.onTurnStart = function() {
-    this._hasPlayed = false;
     this.createBlueCells();
 };
 
 Game_EventBattlerTS.prototype.onTurnEnd = function() {
+    this._hasPlayed = false;
     this.battler().onTurnEnd();
 };
 
 Game_EventBattlerTS.prototype.endAction = function() {
     this.defaultDirection();
     this._hasPlayed = true;
-    this._oldX = this._x;
-    this._oldY = this._y;
 };
 
 Game_EventBattlerTS.prototype.defaultDirection = function() {
@@ -1611,13 +1598,6 @@ Game_EventBattlerTS.prototype.meetsItemRangeConditions = function(item) {
     return false;
 };
 
-Game_EventBattlerTS.prototype.restorePosition = function() {
-    this._event.setPosition(this._oldX, this._oldY);
-    this._x = this._oldX;
-    this._y = this._oldY;
-    this.defaultDirection();
-};
-
 //-----------------------------------------------------------------------------
 // Game_ActorTS
 //
@@ -1685,6 +1665,19 @@ Game_ActorTS.prototype.checkEventsTriggerHere = function(x, y) {
 
 Game_ActorTS.prototype.actions = function() {
     return this._actions;
+};
+
+Game_ActorTS.prototype.restorePosition = function() {
+    var positionX = $gameTemp.positionX();
+    var positionY = $gameTemp.positionY();
+    this._event.setPosition(positionX, positionY);
+    this._x = positionX;
+    this._y = positionY;
+    this.defaultDirection();
+};
+
+Game_ActorTS.prototype.savePosition = function() {
+    $gameTemp.setPosition(this.x, this.y);
 };
 
 //-----------------------------------------------------------------------------
@@ -1903,6 +1896,12 @@ Game_PartyTS.prototype.canNotInput = function() {
     return this.members().filter(function(member) {
         return !member.canInput() && member.canPlay();
     }, this);
+};
+
+Game_PartyTS.prototype.savePosition = function() {
+    this.members().forEach(function(member) {
+        member.savePosition();
+    });
 };
 
 //-----------------------------------------------------------------------------
@@ -2737,6 +2736,40 @@ DataManager.createGameObjects = function() {
     $gameTroopTS =        new Game_TroopTS();
     $gamePartyTS =        new Game_PartyTS();
     DataManager_createGameObjectsTS.call();
+};
+
+var Game_Temp_initializeTS = Game_Temp.prototype.initialize;
+Game_Temp.prototype.initialize = function() {
+    Game_Temp_initializeTS.call(this);
+    this._positionX = null;
+    this._positionY = null;
+};
+
+Game_Temp.prototype.isPositionValid = function(x, y) {
+    this._positionX = x;
+    this._positionY = y;
+};
+
+Game_Temp.prototype.setPosition = function(x, y) {
+    this._positionX = x;
+    this._positionY = y;
+};
+
+Game_Temp.prototype.clearPosition = function() {
+    this._positionX = null;
+    this._positionY = null;
+};
+
+Game_Temp.prototype.isPositionValid = function() {
+    return this._positionX !== null;
+};
+
+Game_Temp.prototype.positionX = function() {
+    return this._positionX;
+};
+
+Game_Temp.prototype.positionY = function() {
+    return this._positionY;
 };
 
 Game_Action.prototype.battleOpponentsUnit = function(subject) {
