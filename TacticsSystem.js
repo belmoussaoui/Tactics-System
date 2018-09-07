@@ -731,11 +731,11 @@ BattleManagerTS.inputtingAction = function() {
 
 BattleManagerTS.endPlayerPhase = function() {
     $gameSelectorTS.savePosition();
-    $gamePartyTS.members().forEach(function(actorTS) {
-        actorTS.onTurnEnd();
-        var actor = actorTS.battler();
-        this._logWindow.displayAutoAffectedStatus(actor);
-        this._logWindow.displayRegeneration(actor);
+    $gameTroopTS.members().forEach(function(enemyTS) {
+        enemyTS.onTurnEnd();
+        var enemy = enemyTS.battler();
+        this._logWindow.displayAutoAffectedStatus(enemy);
+        this._logWindow.displayRegeneration(enemy);
     }, this);
     this.startEnemyPhase();
 };
@@ -776,11 +776,11 @@ BattleManagerTS.getNextEnemy = function() {
 };
 
 BattleManagerTS.endEnemyPhase = function() {
-    $gameTroopTS.members().forEach(function(enemyTS) {
-        enemyTS.onTurnEnd();
-        var enemy = enemyTS.battler();
-        this._logWindow.displayAutoAffectedStatus(enemy);
-        this._logWindow.displayRegeneration(enemy);
+    $gamePartyTS.members().forEach(function(actorTS) {
+        actorTS.onTurnEnd();
+        var actor = actorTS.battler();
+        this._logWindow.displayAutoAffectedStatus(actor);
+        this._logWindow.displayRegeneration(actor);
     }, this);
     this.endTurn();
 };
@@ -1468,11 +1468,11 @@ Game_EventBattlerTS.prototype.isMoving = function() {
 };
 
 Game_EventBattlerTS.prototype.onTurnStart = function() {
+    this._hasPlayed = false;
     this.createBlueCells();
 };
 
 Game_EventBattlerTS.prototype.onTurnEnd = function() {
-    this._hasPlayed = false;
     this.battler().onTurnEnd();
 };
 
