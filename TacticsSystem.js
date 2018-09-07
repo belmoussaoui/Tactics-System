@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.3.1
+// TacticsSystem.js v0.3.2.1
 //=============================================================================
 
 /*:
@@ -155,7 +155,7 @@ Scene_BattleTS.prototype.createHelpWindow = function() {
 Scene_BattleTS.prototype.createSkillWindow = function() {
     var width = Graphics.boxWidth - 192;
     var height = this._actorCommandWindow.fittingHeight(4);
-    this._skillWindow = new Window_BattleSkill(0, this._actorCommandWindow.y, width, height);
+    this._skillWindow = new Window_BattleSkillTS(0, this._actorCommandWindow.y, width, height);
     this._skillWindow.x = Graphics.boxWidth - this._skillWindow.width;
     this._skillWindow.setHelpWindow(this._helpWindow);
     this._skillWindow.setHandler('ok',     this.onSkillOk.bind(this));
@@ -166,7 +166,7 @@ Scene_BattleTS.prototype.createSkillWindow = function() {
 Scene_BattleTS.prototype.createItemWindow = function() {
     var width = Graphics.boxWidth - 192;
     var height = this._actorCommandWindow.fittingHeight(4);
-    this._itemWindow = new Window_BattleItem(0, this._actorCommandWindow.y, width, height);
+    this._itemWindow = new Window_BattleItemTS(0, this._actorCommandWindow.y, width, height);
     this._itemWindow.x = Graphics.boxWidth - this._itemWindow.width;
     this._itemWindow.setHelpWindow(this._helpWindow);
     this._itemWindow.setHandler('ok',     this.onItemOk.bind(this));
@@ -411,12 +411,11 @@ Scene_BattleTS.prototype.onSkillOk = function() {
     var action = BattleManagerTS.inputtingAction();
     action.setSkill(skill.id);
     BattleManagerTS.subject().setLastBattleSkill(skill);
-    BattleManagerTS.setupLocalBattle(action);
-    BattleManagerTS.updateRedCells(action);
     this.onSelectAction();
 };
 
 Scene_BattleTS.prototype.onSkillCancel = function() {
+    BattleManagerTS.processCancel();
     this._skillWindow.hide();
     this._actorCommandWindow.activate();
 };
@@ -426,12 +425,11 @@ Scene_BattleTS.prototype.onItemOk = function() {
     var action = BattleManagerTS.inputtingAction();
     action.setItem(item.id);
     $gameParty.setLastItem(item);
-    BattleManagerTS.setupLocalBattle(action);
-    BattleManagerTS.updateRedCells(action);
     this.onSelectAction();
 };
 
 Scene_BattleTS.prototype.onItemCancel = function() {
+    BattleManagerTS.processCancel();
     this._itemWindow.hide();
     this._actorCommandWindow.activate();
 };
@@ -934,6 +932,11 @@ BattleManagerTS.setupLocalBattle = function(action) {
     gameFriends.setupTS(action.battleFriendsUnit(this._subject));
     var gameOpponents = action.opponentsUnit();
     gameOpponents.setupTS(action.battleOpponentsUnit(this._subject));
+};
+
+BattleManagerTS.showRedCells = function(action) {
+    BattleManagerTS.setupLocalBattle(action);
+    BattleManagerTS.updateRedCells(action);
 };
 
 BattleManagerTS.updateRedCells = function(action) {
@@ -2106,49 +2109,17 @@ Window_BattleTargetTS.prototype.show = function() {
 };
 
 Window_BattleTargetTS.prototype.processCursorMove = function () {
-    if (this.isCursorMovable()) {
-        var lastIndex = this.index();
-        if (Input.isRepeated('down')) {
-            this.cursorDown(Input.isTriggered('down'));
-        }
-        if (Input.isRepeated('up')) {
-            this.cursorUp(Input.isTriggered('up'));
-        }
-        if (Input.isRepeated('right')) {
-            this.cursorRight(Input.isTriggered('right'));
-        }
-        if (Input.isRepeated('left')) {
-            this.cursorLeft(Input.isTriggered('left'));
-        }
-        if (this.index() !== lastIndex) {
-            SoundManager.playCursor();
-            BattleManagerTS.performTransfer(this.target());
-        }
+    var lastIndex = this.index();
+    Window_Selectable.prototype.processCursorMove.call(this);
+    if (this.index() !== lastIndex) {
+        BattleManagerTS.performTransfer(this.target());
     }
 };
 
 Window_BattleTargetTS.prototype.onTouch = function(triggered) {
     var lastIndex = this.index();
-    var x = this.canvasToLocalX(TouchInput.x);
-    var y = this.canvasToLocalY(TouchInput.y);
-    var hitIndex = this.hitTest(x, y);
-    if (hitIndex >= 0) {
-        if (hitIndex === this.index()) {
-            if (triggered && this.isTouchOkEnabled()) {
-                this.processOk();
-            }
-        } else if (this.isCursorMovable()) {
-            this.select(hitIndex);
-        }
-    } else if (this._stayCount >= 10) {
-        if (y < this.padding) {
-            this.cursorUp();
-        } else if (y >= this.height - this.padding) {
-            this.cursorDown();
-        }
-    }
+    Window_Selectable.prototype.onTouch.call(this);
     if (this.index() !== lastIndex) {
-        SoundManager.playCursor();
         BattleManagerTS.performTransfer(this.target());
     }
 };
@@ -2301,6 +2272,68 @@ Window_BattleEventTS.prototype.refresh = function() {
         this._actions = subject.actions();
     }
     Window_BattleTargetTS.prototype.refresh.call(this);
+};
+
+//-----------------------------------------------------------------------------
+// Window_BattleSkillTS
+//
+// The window for selecting a skill to use on the battle screen.
+
+function Window_BattleSkillTS() {
+    this.initialize.apply(this, arguments);
+}
+
+Window_BattleSkillTS.prototype = Object.create(Window_BattleSkill.prototype);
+Window_BattleSkillTS.prototype.constructor = Window_BattleSkillTS;
+
+Window_BattleSkillTS.prototype.processCursorMove = function() {
+    var lastIndex = this.index();
+    Window_BattleSkill.prototype.processCursorMove.call(this);
+    if (this.index() !== lastIndex) {
+        var action = BattleManagerTS.inputtingAction();
+        action.setSkill(this.item().id);
+        BattleManagerTS.showRedCells(action);
+    }
+};
+
+Window_BattleSkillTS.prototype.show = function() {
+    Window_BattleSkill.prototype.show.call(this);
+    if (this.item()) {
+        var action = BattleManagerTS.inputtingAction();
+        action.setSkill(this.item().id);
+        BattleManagerTS.showRedCells(action);
+    }
+};
+
+//-----------------------------------------------------------------------------
+// Window_BattleItemTS
+//
+// The window for selecting a item to use on the battle screen.
+
+function Window_BattleItemTS() {
+    this.initialize.apply(this, arguments);
+}
+
+Window_BattleItemTS.prototype = Object.create(Window_BattleItem.prototype);
+Window_BattleItemTS.prototype.constructor = Window_BattleSkillTS;
+
+Window_BattleItemTS.prototype.processCursorMove = function() {
+    var lastIndex = this.index();
+    Window_BattleItem.prototype.processCursorMove.call(this);
+    if (this.index() !== lastIndex) {
+        var action = BattleManagerTS.inputtingAction();
+        action.setItem(this.item().id);
+        BattleManagerTS.showRedCells(action);
+    }
+};
+
+Window_BattleItemTS.prototype.show = function() {
+    Window_BattleItem.prototype.show.call(this);
+    if (this.item()) {
+        var action = BattleManagerTS.inputtingAction();
+        action.setItem(this.item().id);
+        BattleManagerTS.showRedCells(action);
+    }
 };
 
 //-----------------------------------------------------------------------------
