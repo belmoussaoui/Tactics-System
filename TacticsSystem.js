@@ -668,8 +668,8 @@ BattleManagerTS.startPlayerPhase = function() {
         this.selectNextCommand(actor);
     }
     this._subject = null;
-    $gameTroopTS.updateBlueCells();
-    $gamePartyTS.updateBlueCells();
+    $gameTroopTS.updateRange();
+    $gamePartyTS.updateRange();
     this.updateBlueCells();
     if (this.isPlayerPhase()) {
         this._phase = 'playerExplore';
@@ -696,7 +696,7 @@ BattleManagerTS.updateExplore = function() {
 };
 
 BattleManagerTS.updateSelect = function() {
-    if (this.isOnBlueCells(this._blueCells)) {
+    if ($gameSelectorTS.isOnBlueCells(this._blueCells)) {
         if (this.canExecuteMove($gameSelectorTS.select())) {
             SoundManager.playOk();
             this._spriteset.removeBlueCells();
@@ -756,9 +756,9 @@ BattleManagerTS.isEnemyPhase = function() {
 BattleManagerTS.updateEnemyPhase = function() {
     this._subject = this.getNextEnemy();
     $gameTroop.setupTS([this.subject()]);
-    this._subject.updateBlueCells();
+    this._subject.updateRange();
     var pos = this._subject.findBestMove();
-    $gameSelectorTS.performTransfer(pos[0], pos[1]);
+    $gameSelectorTS.performTransfer(pos.x, pos.y);
     this._phase = 'move';
 };
 
@@ -900,7 +900,7 @@ BattleManagerTS.updateLastTarget = function() {
     $gameSelectorTS.updateSelect();
     var battler = $gameSelectorTS.select()
     if (battler != null) {
-        battler.createBlueCells();
+        battler.updateRange();
         this.updateBlueCells();
     }
 };
@@ -1140,18 +1140,6 @@ BattleManagerTS.canExecuteMove = function(subject) {
 
 BattleManagerTS.selectIsValidForMove = function(subject) {
     return (!subject || subject === this._subject);
-};
-
-BattleManagerTS.isOnBlueCells = function(blueCells) {
-    for (var i = 0; i < blueCells.length; i++) {
-        var blueCell = blueCells[i];
-        var x = blueCell[0];
-        var y = blueCell[1];
-        if ($gameSelectorTS.pos(x, y)) {
-            return true;
-        }
-    }
-    return false;
 };
 
 //-----------------------------------------------------------------------------
@@ -1409,6 +1397,18 @@ Game_SelectorTS.prototype.triggerTouchAction = function() {
     return false;
 };
 
+Game_SelectorTS.prototype.isOnBlueCells = function(blueCells) {
+    for (var i = 0; i < blueCells.length; i++) {
+        var blueCell = blueCells[i];
+        var x = blueCell.x;
+        var y = blueCell.y;
+        if (this.pos(x, y)) {
+            return true;
+        }
+    }
+    return false;
+};
+
 //-----------------------------------------------------------------------------
 // Game_EventBattlerTS
 //
@@ -1469,7 +1469,7 @@ Game_EventBattlerTS.prototype.isMoving = function() {
 
 Game_EventBattlerTS.prototype.onTurnStart = function() {
     this._hasPlayed = false;
-    this.createBlueCells();
+    this.updateRange();
 };
 
 Game_EventBattlerTS.prototype.onTurnEnd = function() {
@@ -1489,49 +1489,51 @@ Game_EventBattlerTS.prototype.blueCells = function() {
     return this._blueCells;
 };
 
-Game_EventBattlerTS.prototype.updateBlueCells = function() {
-    this.createBlueCells();
+Game_EventBattlerTS.prototype.updateRange = function() {
+    this._blueCells = this.createMoveRange(this._move);
 };
 
-Game_EventBattlerTS.prototype.createBlueCells = function() {
-    var start = [[this.x, this.y]]
-    this._blueCells = [[this.x, this.y]];
-    for (var i = 0; i < this._move; i++) {
+Game_EventBattlerTS.prototype.createMoveRange = function(move) {
+    var start = [new Point(this.x, this.y)]
+    var range = [new Point(this.x, this.y)];
+    for (var i = 0; i < move; i++) {
         var temp = [];
         for (var j = 0; j < start.length; j++) {
-            var nextCells = this.nextCells(start[j]);
-            this._blueCells = this._blueCells.concat(nextCells);
+            var nextCells = this.nextCells(start[j], range);
+            range = range.concat(nextCells);
             temp = temp.concat(nextCells);
         }
         start = JsonEx.makeDeepCopy(temp);
     }
+    return range
 };
 
-Game_EventBattlerTS.prototype.nextCells = function (start) {
-    var x = start[0];
-    var y = start[1];
+Game_EventBattlerTS.prototype.nextCells = function (start, range) {
+    var x = start.x;
+    var y = start.y;
     var nextCells = [];
     for (var d = 8; d >= 2; d -= 2) {
         if (this._event.canPass(x, y, d)) {
             var x2 = $gameMap.roundXWithDirection(x, d);
             var y2 = $gameMap.roundYWithDirection(y, d);
-            if (!this.isMoveValid(x2, y2)) {
-                nextCells.push([x2, y2]);
+            if (this.isMoveValid(x2, y2, range)) {
+                nextCells.push(new Point(x2, y2));
             }
         }
     }
     return nextCells;
 };
 
-Game_EventBattlerTS.prototype.isMoveValid = function (x, y) {
-    for (var i = 0; i < this._blueCells.length; i++) {
-        var x2 = this._blueCells[i][0];
-        var y2 = this._blueCells[i][1];
+Game_EventBattlerTS.prototype.isMoveValid = function (x, y, range) {
+    for (var i = 0; i < range.length; i++) {
+        var pos = range[i];
+        var x2 = pos.x;
+        var y2 = pos.y;
         if (x === x2 && y === y2) {
-            return true;
+            return false;
         }
     }
-    return false;
+    return true;
 };
 
 Game_EventBattlerTS.prototype.moveStraightTo = function(x, y) {
@@ -1698,24 +1700,26 @@ Game_EnemyTS.prototype.constructor = Game_EnemyTS;
 Game_EnemyTS.prototype.initialize = function(x, y, enemyId, eventId) {
     Game_EventBattlerTS.prototype.initialize.call(this, x, y, eventId);
     this._enemy = new Game_Enemy(enemyId, x, y);
+    this._char = new Game_Character();
     this.setMove($dataEnemies[enemyId]);
-    this.setScope($dataEnemies[enemyId]);
+    this.setAggro($dataEnemies[enemyId], eventId);
 };
 
-Game_EnemyTS.prototype.setScope = function(object) {
-    this._scope = object.meta['scope'] || this._move;
+Game_EnemyTS.prototype.setAggro = function(object, eventId) {
+    var data = $dataMap.events[eventId];
+    this._aggro = parseInt(data.meta['aggro']) || object.meta['aggro'] || this._move;
 };
 
-Game_EnemyTS.prototype.scope = function() {
-    return this._scope;
+Game_EnemyTS.prototype.aggro = function() {
+    return this._aggro;
+};
+
+Game_EnemyTS.prototype.aggroCells = function() {
+    return this._aggroCells;
 };
 
 Game_EnemyTS.prototype.battler = function() {
     return this._enemy;
-};
-
-Game_EnemyTS.prototype.enemy = function() {
-    return this._enemy.enemy();
 };
 
 Game_EnemyTS.prototype.opponentsUnit = function() {
@@ -1726,29 +1730,66 @@ Game_EnemyTS.prototype.friendsUnit = function() {
     return $gameTroopTS;
 };
 
-Game_EnemyTS.prototype.findBestMove = function() {
+Game_EnemyTS.prototype.findTarget = function() {
     var rate = 0;
     var x = this.x;
     var y = this.y;
-    var pos = [this.x, this.y];
-    for (var i = 0; i < this.blueCells().length; i++) {
-        var temp = this.blueCells()[i];
-        this._x = temp[0];
-        this._y = temp[1];
-        var actionList = this.enemy().actions.filter(function(a) {
+    var target = new Point(this.x, this.y);
+    for (var i = 0; i < this.aggroCells().length; i++) {
+        var temp = this.aggroCells()[i];
+        this._x = temp.x;
+        this._y = temp.y;
+        var actionList = this.battler().enemy().actions.filter(function(a) {
             return this.battler().isActionValid(a);
         }, this);
         var sum = actionList.reduce(function(r, a) {
-            return r + a.rating;
+            return r + a.rating * 3;
         }, 0);
         if (sum > rate) {
             rate = sum;
-            pos = [this.x, this.y];
+            target = new Point(this.x, this.y);
         }
     }
     this._x = x;
     this._y = y;
+    return target;
+};
+
+Game_EnemyTS.prototype.findBestMove = function() {
+    var target = this.findTarget();
+    var pos = new Point(this.x, this.y);
+    this._char.setPosition(this.x, this.y)
+    while (!this.isPosFound(this._char.x, this._char.y, pos, target)) {
+        pos = new Point(this._char.x, this._char.y);
+        var direction = this._char.findDirectionTo(target.x, target.y);
+        this._char.moveStraight(direction);
+    }
     return pos;
+};
+
+Game_EnemyTS.prototype.isPosFound = function(x, y, pos, target) {
+    return !this.isOnBlueCells(x, y) || this.isOnTarget(pos, target);
+};
+
+Game_EnemyTS.prototype.isOnBlueCells= function(x, y) {
+    for (var i = 0; i < this.blueCells().length; i++) {
+        var pos = this.blueCells()[i];
+        var x2 = pos.x;
+        var y2 = pos.y;
+        if (x === x2 && y === y2) {
+            return true;
+        }
+    }
+    return false;
+};
+
+Game_EnemyTS.prototype.isOnTarget = function(pos, target) {
+    return pos.x === target.x && pos.y === target.y;
+};
+
+Game_EnemyTS.prototype.updateRange = function() {
+    this._blueCells = this.createMoveRange(this._move);
+    this._aggroCells = this.createMoveRange(this._aggro);
 };
 
 //-----------------------------------------------------------------------------
@@ -1797,9 +1838,9 @@ Game_UnitTS.prototype.makeActions = function() {
     });
 };
 
-Game_UnitTS.prototype.updateBlueCells = function() {
+Game_UnitTS.prototype.updateRange = function() {
     this.members().forEach(function(member) {
-        member.updateBlueCells();
+        member.updateRange();
     });
 };
 
@@ -2496,8 +2537,8 @@ Spriteset_MapTS.prototype.battlerSprites = function() {
 Spriteset_MapTS.prototype.createBlueCells = function(blueCells) {
     this._blueCells = [];
     for (var i = 0; i < blueCells.length; i++) {
-        var x = blueCells[i][0];
-        var y = blueCells[i][1];
+        var x = blueCells[i].x;
+        var y = blueCells[i].y;
         var color = TacticsSystem.moveScopeColor || '#0066CC';
         var cell = this.createColorCell(x, y, color);
         this._blueCells.push(cell);
