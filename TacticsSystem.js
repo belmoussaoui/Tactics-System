@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.3.2.1-a
+// TacticsSystem.js v0.3.2.1-b
 //=============================================================================
 
 /*:
@@ -531,7 +531,6 @@ BattleManagerTS.setupGameObjectsTS = function(actors, enemies) {
     $gameParty.setupTS($gamePartyTS.battlerMembers());
     $gameTroopTS.setup(enemies);
     $gameTroop.setupTS($gameTroopTS.battleMembers());
-    $gameSelectorTS.setup(actors.concat(enemies));  // to do
 };
 
 BattleManagerTS.createGameActors = function(actors, event, i) {
@@ -941,6 +940,7 @@ BattleManagerTS.selectPreviousCommand = function() {
     this._subject.restorePosition();
     $gameSelectorTS.updateSelect();
     this.refreshBlueCells();
+    this._phase = 'playerExplore'
 };
 
 BattleManagerTS.checkBattleEnd = function() {
@@ -1157,11 +1157,6 @@ Game_SelectorTS.prototype.initMembers = function() {
     this._wait = 0;
     this._select = null;
     this._hadMoved = false;
-    this._data = [];
-};
-
-Game_SelectorTS.prototype.setup = function(data) {
-    this._data = data;
 };
 
 Game_SelectorTS.prototype.pos = function(x, y) {
@@ -1181,7 +1176,7 @@ Game_SelectorTS.prototype.select = function() {
     return this._select;
 };
 
-Game_SelectorTS.prototype.hadMoved= function(x, y) {
+Game_SelectorTS.prototype.hadMoved= function() {
     return this._hadMoved;
 };
 
@@ -1262,7 +1257,6 @@ Game_SelectorTS.prototype.findDirectionTo = function(x, y) {
 };
 
 Game_SelectorTS.prototype.executeMove = function(x, y, direction) {
-    this._hadMoved = true;
     this._wait = 1;
     this._direction = direction;
     this._x = x;
@@ -1272,7 +1266,6 @@ Game_SelectorTS.prototype.executeMove = function(x, y, direction) {
 Game_SelectorTS.prototype.performTransfer = function(x, y) {
     this._realX = this._x = x;
     this._realY = this._y = y;
-    this._hadMoved = true;
     $gameMap.setDisplayPos(x - this.centerX(), y - this.centerY());
     this.updateSelect();
 };
@@ -1297,10 +1290,14 @@ Game_SelectorTS.prototype.updateMove = function() {
 };
 
 Game_SelectorTS.prototype.updateSelect = function() {
+    this._hadMoved = true;
     this._select = null;
-    this._data.forEach(function(data) {
-        if (data && data.isAlive() && this.isOnData(data)) {
-            this._select = data;
+    var actors = $gamePartyTS.aliveMembers();
+    var enemies = $gameTroopTS.aliveMembers();
+    var data = actors.concat(enemies);
+    data.forEach(function(battler) {
+        if (this.isOnData(battler)) {
+            this._select = battler;
         }
     }, this);
 };
