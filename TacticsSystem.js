@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.3.2.1-b
+// TacticsSystem.js v0.3.3
 //=============================================================================
 
 /*:
@@ -208,7 +208,6 @@ Scene_BattleTS.prototype.createMessageWindow = function() {
 Scene_BattleTS.prototype.start = function() {
     Scene_Base.prototype.start.call(this);
     //BattleManagerTS.playBattleBgm();  see updateEncounterEffect
-    BattleManagerTS.startBattle();
 };
 
 Scene_BattleTS.prototype.update = function() {
@@ -473,7 +472,6 @@ Scene_BattleTS.prototype.needsSlowFadeOut = function() {
 
 Scene_BattleTS.prototype.terminate = function() {
     Scene_Base.prototype.terminate.call(this);
-    BattleManagerTS.terminate();
 };
 
 //-----------------------------------------------------------------------------
@@ -492,6 +490,7 @@ BattleManagerTS.setup = function() {
     $gamePartyTS.onBattleStart();
     $gameTroop.clear();
     this.createGameObjects();
+    this.startBattle();
 };
 
 BattleManagerTS.initMembers = function() {
@@ -513,34 +512,42 @@ BattleManagerTS.initMembers = function() {
 BattleManagerTS.createGameObjects = function() {
     var actors = [];
     var enemies = [];
-    for (var i = 1; i < $dataMap.events.length; i++) {
-        var event = $dataMap.events[i];
-        if (event) {  // for deleted events
-            if (parseInt(event.meta['actor']) > 0) {
-                this.createGameActors(actors, event, i);
-            } else if (parseInt(event.meta['enemy']) > 0) {
-                this.createGameEnemies(enemies, event, i);
-            }
+    for (var i = 0; i < $gameMap.events().length; i++) {
+        var event = $gameMap.events()[i];
+        var meta = event.meta();
+        if (parseInt(meta['actor']) > 0) {
+            this.createGameActors(actors, event);
+        } else if (parseInt(meta['enemy']) > 0) {
+            this.createGameEnemies(enemies, event);
         }
     }
     this.setupGameObjectsTS(actors, enemies);
 };
 
 BattleManagerTS.setupGameObjectsTS = function(actors, enemies) {
+    console.log(actors);
+    console.log(enemies);
     $gamePartyTS.setup(actors);
     $gameParty.setupTS($gamePartyTS.battlerMembers());
     $gameTroopTS.setup(enemies);
     $gameTroop.setupTS($gameTroopTS.battleMembers());
 };
 
-BattleManagerTS.createGameActors = function(actors, event, i) {
-    var actorId = parseInt(event.meta['actor']);
-    actors.push(new Game_ActorTS(event.x, event.y, actorId, i));
+BattleManagerTS.createGameActors = function(actors, event) {
+    var actorId = parseInt(event.meta()['actor']);
+    actors.push(new Game_ActorTS(event, actorId));
 };
 
-BattleManagerTS.createGameEnemies = function(enemies, event, i) {
-    var enemyId = parseInt(event.meta['enemy']);
-    enemies.push(new Game_EnemyTS(event.x, event.y, enemyId, i));
+BattleManagerTS.createGameEnemies = function(enemies, event) {
+    var enemyId = parseInt(event.meta()['enemy']);
+    enemies.push(new Game_EnemyTS(event, enemyId));
+};
+
+BattleManagerTS.startBattle = function() {
+    var x = $gamePlayer.x;
+    var y = $gamePlayer.y;
+    $gameSelectorTS.setPosition(x, y);
+    this._phase = 'preparation';
 };
 
 BattleManagerTS.setLogWindow = function(logWindow) {
@@ -557,14 +564,6 @@ BattleManagerTS.subjectTS = function() {
 
 BattleManagerTS.subject = function() {
     return this._subject.battler();
-};
-
-BattleManagerTS.startBattle = function() {
-    var x = $gamePlayer.x;
-    var y = $gamePlayer.y;
-    $gameSelectorTS.setPosition(x, y);
-    this._spriteset.createGrid();
-    this._phase = 'preparation';
 };
 
 BattleManagerTS.active = function() {
@@ -1408,11 +1407,11 @@ Object.defineProperties(Game_EventBattlerTS.prototype, {
     y: { get: function() { return this._y; }, configurable: true }
 });
 
-Game_EventBattlerTS.prototype.initialize = function(x, y, eventId) {
+Game_EventBattlerTS.prototype.initialize = function(event) {
     this.initMembers()
-    this._x = x;
-    this._y = y;
-    this._event = $gameMap.event(eventId);
+    this._x = event.x;
+    this._y = event.y;
+    this._event = event;
 };
 
 Game_EventBattlerTS.prototype.initMembers = function() {
@@ -1596,8 +1595,8 @@ function Game_ActorTS() {
 Game_ActorTS.prototype = Object.create(Game_EventBattlerTS.prototype);
 Game_ActorTS.prototype.constructor = Game_ActorTS;
 
-Game_ActorTS.prototype.initialize = function(x, y, actorId, eventId) {
-    Game_EventBattlerTS.prototype.initialize.call(this, x, y, eventId);
+Game_ActorTS.prototype.initialize = function(event, actorId) {
+    Game_EventBattlerTS.prototype.initialize.call(this, event);
     this._actor = $gameActors.actor(actorId);
     this._actions = [];
     this.setMove($dataActors[actorId]);
@@ -1678,17 +1677,17 @@ function Game_EnemyTS() {
 Game_EnemyTS.prototype = Object.create(Game_EventBattlerTS.prototype);
 Game_EnemyTS.prototype.constructor = Game_EnemyTS;
 
-Game_EnemyTS.prototype.initialize = function(x, y, enemyId, eventId) {
-    Game_EventBattlerTS.prototype.initialize.call(this, x, y, eventId);
-    this._enemy = new Game_Enemy(enemyId, x, y);
+Game_EnemyTS.prototype.initialize = function(event, enemyId) {
+    Game_EventBattlerTS.prototype.initialize.call(this, event);
+    this._enemy = new Game_Enemy(enemyId, event.x, event.y); // x and y !s
     this._char = new Game_Character();
     this.setMove($dataEnemies[enemyId]);
-    this.setAggro($dataEnemies[enemyId], eventId);
+    this.setAggro($dataEnemies[enemyId], event);
 };
 
-Game_EnemyTS.prototype.setAggro = function(object, eventId) {
-    var data = $dataMap.events[eventId];
-    this._aggro = parseInt(data.meta['aggro']) || object.meta['aggro'] || this._move;
+Game_EnemyTS.prototype.setAggro = function(object, event) {
+    var meta = event.meta();
+    this._aggro = parseInt(meta['aggro']) || object.meta['aggro'] || this._move;
 };
 
 Game_EnemyTS.prototype.aggro = function() {
@@ -2081,7 +2080,6 @@ Window_BattleTargetTS.prototype.initialize = function(x, y) {
     var width = this.windowWidth();
     var height = this.windowHeight();
     Window_Selectable.prototype.initialize.call(this, x, y, width, height);
-    this.refresh();
     this.hide();
 };
 
@@ -2649,15 +2647,13 @@ Sprite_BattlerTS.prototype.updateDamagePopup = function() {
 
 Sprite_BattlerTS.prototype.setupDamagePopup = function() {
     if (this._battler.isDamagePopupRequested()) {
-        if (this._battler.isSpriteVisible()) {
-            var sprite = new Sprite_Damage();
-            sprite.x = this.x + this.damageOffsetX();
-            sprite.y = this.y + this.damageOffsetY();
-            sprite.z = this.z + 1;
-            sprite.setup(this._battler);
-            this._damages.push(sprite);
-            this.parent.addChild(sprite);
-        }
+        var sprite = new Sprite_Damage();
+        sprite.x = this.x + this.damageOffsetX();
+        sprite.y = this.y + this.damageOffsetY();
+        sprite.z = this.z + 1;
+        sprite.setup(this._battler);
+        this._damages.push(sprite);
+        this.parent.addChild(sprite);
         this._battler.clearDamagePopup();
         this._battler.clearResult();
     }
@@ -2886,7 +2882,7 @@ Game_Action.prototype.range = function() {
 
 var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
 Game_BattlerBase.prototype.canUse = function(item) {
-    if ($gameParty.inBattleTS()) {
+    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
         if (!this.isItemRangeValid(item)) {
             return false;
         }
@@ -2913,7 +2909,7 @@ Game_Actor.prototype.friendsUnitTS = function() {
 };
 
 Game_Actor.prototype.isSpriteVisible = function() {
-    return $gameSystem.isSideView() || $gameParty.inBattleTS();
+    return $gameSystem.isSideView();
 };
 
 Game_Enemy.prototype.friendsUnitTS = function() {
@@ -2955,8 +2951,7 @@ Game_CharacterBase.prototype.isCollidedWithEvents = function(x, y) {
     // it's used to calculate the shortest path
     var events = $gameMap.eventsXyNt(x, y);
     return events.some(function(event) {
-        var dataEvent = $dataMap.events[event.eventId()];
-        return event.isNormalPriority() && isNaN(parseInt(dataEvent.meta["actor"]));
+        return event.isNormalPriority() && isNaN(parseInt(event.meta()["actor"]));
     });
 };
 
@@ -2964,25 +2959,24 @@ Game_Character.prototype.searchLimit = function() {
     return 32; // 12 by default
 };
 
-var Game_Event_isCollidedWithEventsTS = Game_Event.prototype.isCollidedWithEvents;
-Game_Event.prototype.isCollidedWithEvents = function(x, y) {
-    // for an actor to pass through an actor
-    var thisDataEvent = $dataMap.events[this.eventId()];
-    if (!isNaN(parseInt(thisDataEvent.meta["actor"]))) {
-        var events = $gameMap.eventsXyNt(x, y);
-        return events.some(function(event) {
-            var dataEvent = $dataMap.events[event.eventId()];
-            return event.isNormalPriority() && isNaN(parseInt(dataEvent.meta["actor"]));
-        });
-    } else {
-        return Game_Event_isCollidedWithEventsTS.call(this, x, y);
-    }
-};
-
 var Game_Event_initializeTS = Game_Event.prototype.initialize;
 Game_Event.prototype.initialize = function(mapId, eventId) {
     Game_Event_initializeTS.call(this, mapId, eventId);
     this.setName(this.event().name);
+    this.setMeta(this.event().meta);
+};
+
+var Game_Event_isCollidedWithEventsTS = Game_Event.prototype.isCollidedWithEvents;
+Game_Event.prototype.isCollidedWithEvents = function(x, y) {
+    // for an actor to pass through an actor
+    if (!isNaN(parseInt(this.meta()["actor"]))) {
+        var events = $gameMap.eventsXyNt(x, y);
+        return events.some(function(event) {
+            return event.isNormalPriority() && isNaN(parseInt(event.meta()["actor"]));
+        });
+    } else {
+        return Game_Event_isCollidedWithEventsTS.call(this, x, y);
+    }
 };
 
 Game_Event.prototype.setName = function(name) {
@@ -2991,6 +2985,14 @@ Game_Event.prototype.setName = function(name) {
 
 Game_Event.prototype.name = function() {
     return this._name;
+};
+
+Game_Event.prototype.setMeta = function(meta) {
+    this._meta = meta;
+};
+
+Game_Event.prototype.meta = function() {
+    return this._meta;
 };
 
 Game_Event.prototype.isActorTS = function() {
@@ -3020,7 +3022,7 @@ Game_Interpreter.prototype.updateWaitMode = function() {
 
 var Window_BattleLog_showNormalAnimationTS = Window_BattleLog.prototype.showNormalAnimation;
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
-    if ($gameParty.inBattleTS()) {
+    if ($gameParty.inBattleTS()  && !$gameParty.inBattle()) {
         var animation = $dataAnimations[animationId];
         if (animation) {
             targets.forEach(function(target) {
