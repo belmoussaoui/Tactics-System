@@ -208,6 +208,7 @@ Scene_BattleTS.prototype.createMessageWindow = function() {
 Scene_BattleTS.prototype.start = function() {
     Scene_Base.prototype.start.call(this);
     //BattleManagerTS.playBattleBgm();  see updateEncounterEffect
+    BattleManagerTS.startBattle();
 };
 
 Scene_BattleTS.prototype.update = function() {
@@ -484,11 +485,10 @@ BattleManagerTS.setup = function() {
     $gameScreen.onBattleStart();
     $gameTroop.clear();
     this.createGameObjects();
-    this.startBattle();
 };
 
 BattleManagerTS.initMembers = function() {
-    this._phase = 'init';
+    this._phase = 'preparation';
     this._canLose = false;
     this._logWindow = null;
     this._spriteset = null;
@@ -539,7 +539,7 @@ BattleManagerTS.startBattle = function() {
     var x = $gamePlayer.x;
     var y = $gamePlayer.y;
     $gameSelectorTS.setPosition(x, y);
-    this._phase = 'preparation';
+    this._spriteset.createGrid()
 };
 
 BattleManagerTS.setLogWindow = function(logWindow) {
@@ -599,7 +599,6 @@ BattleManagerTS.isBusy = function() {
 BattleManagerTS.updateEvent = function() {
     switch (this._phase) {
     case 'playerExplore':
-    case 'enemyPhase':
     case 'action':
         return this.updateEventMain();
     }
@@ -641,7 +640,7 @@ BattleManagerTS.startTurn = function() {
 };
 
 BattleManagerTS.makePlayersOrder = function() {
-    var battlers = $gamePartyTS.restrictedMembers();//Restricted();
+    var battlers = $gamePartyTS.restrictedMembers();
     // agiliy sort...
     this._playersOrder = battlers;
 };
@@ -663,7 +662,6 @@ BattleManagerTS.getNextEnemy = function() {
 BattleManagerTS.startPlayerPhase = function() {
     this._subject = this.getNextPlayer();
     if (this._subject) { // restrictionPhase
-        console.log('ok');
         this.updatePlayerPhase();
     } else if (this.isPlayerPhase()) {
         $gameTroopTS.updateRange();
@@ -777,12 +775,11 @@ BattleManagerTS.endEnemyPhase = function() {
 };
 
 BattleManagerTS.processAction = function() {
-    // makeaction doit être fait avant processaction et après le move
     var subject = this.subject();
     var action = subject.currentAction();
     if (action) {
         action.prepare();
-       if (action.isValid()) {
+        if (action.isValid()) {
             this.setupLocalBattle(action);
             this.startAction();
         }
@@ -797,7 +794,7 @@ BattleManagerTS.processAction = function() {
 };
 
 BattleManagerTS.refreshState = function(battler) {
-    var friendsUnitTS = battler.friendsUnitTS();  // to do sprite !
+    var friendsUnitTS = battler.friendsUnitTS();  // use sprite !
     battler = friendsUnitTS.getBattlerTS(battler);
     battler.refreshState();
 };
@@ -1442,7 +1439,7 @@ Game_BattlerTS.prototype.onTurnStart = function() {
 };
 
 Game_BattlerTS.prototype.endAction = function() {
-    this.defaultDirection();  // to do
+    this.defaultDirection();  // use state
     this._hasPlayed = true;
 };
 
@@ -1532,15 +1529,15 @@ Game_BattlerTS.prototype.isItemRangeValid = function(item) {
     if (!item) {
         return false;
     } else if (DataManager.isSkill(item)) {
-        return this.meetsSkillRangeConditions(item);
+        return this.isSkillRangeOk(item);
     } else if (DataManager.isItem(item)) {
-        return this.meetsItemRangeConditions(item);
+        return this.isItemRangeOk(item);
     } else {
         return false;
     }
 };
 
-Game_BattlerTS.prototype.meetsSkillRangeConditions = function(item) {
+Game_BattlerTS.prototype.isSkillRangeOk = function(item) {
     var action = new Game_Action(this.battler());
     action.setSkill(item.id);
     if (action.isForOpponent()) {
@@ -1552,7 +1549,7 @@ Game_BattlerTS.prototype.meetsSkillRangeConditions = function(item) {
     return false;
 };
 
-Game_BattlerTS.prototype.meetsItemRangeConditions = function(item) {
+Game_BattlerTS.prototype.isItemRangeOk = function(item) {
     var action = new Game_Action(this.battler());
     action.setItem(item.id);
     if (action.isForOpponent()) {
@@ -1565,54 +1562,45 @@ Game_BattlerTS.prototype.meetsItemRangeConditions = function(item) {
 };
 
 Game_BattlerTS.prototype.makeMove = function() {
-    if (this.isConfused()) {
+    //if (this.isAutoBattle()) {
+    //    this.makeAutoBattleMove();
+    //}
+    if (this.battler().isConfused()) {
         return this.makeConfusionMove();
     }
     return new Point(this.x, this.y);
 };
 
 Game_BattlerTS.prototype.makeConfusionMove = function() {
-    // choose enemy or actor
-    var x = this.x;
-    var y = this.y;
+    var action = new Game_Action(this.battler());
+    action.setConfusion();
     var target = [new Point(this.x, this.y)];
-    for (var i = 0; i < this.blueCells().length; i++) {  // problème une unité peut être déjà sur un case bleue
+    for (var i = 0; i < this.blueCells().length; i++) {
         var temp = this.blueCells()[i];
         this._x = temp.x;
         this._y = temp.y;
-        if (this.isValid($dataSkills[this.battler().attackSkillId()])) {
-            // verification de la cellule si il n'y a personne
-            target.push(new Point(this.x, this.y));
+        if (this.battler().canUse(action.item()) && this.isConfusedRangeOk(action)) {
+            if ($gameMap.eventsXy(this._x, this._y).length === 0) {
+                target.push(new Point(this.x, this.y));
+            }
         }
     }
-    this._x = x;
-    this._y = y;
-
-    return target[Math.floor(Math.random() * target.length)];
+    target = target[Math.floor(Math.random() * target.length)];
+    this._x = target.x;
+    this._y = target.y;
+    return target;
 };
 
-Game_BattlerTS.prototype.isValid = function(item) {
-    var action = new Game_Action(this.battler());
-    action.setItem(item.id);
+Game_BattlerTS.prototype.isConfusedRangeOk = function(action) {
     switch (this.battler().confusionLevel()) {
     case 1:
         return action.battleOpponentsUnit(this).length > 0;
     case 2:
-        if (Math.randomInt(2) === 0) {
-            return action.battleOpponentsUnit(this).length > 0;
-        }
-        return action.battleFriendsUnit(this).length > 1;
+        return action.battleOpponentsUnit(this).length > 0 ||
+            action.battleFriendsUnit(this).length > 1;  // don't count self
     default:
         return action.battleFriendsUnit(this).length > 1;
     }
-};
-
-Game_BattlerTS.prototype.isConfused = function() {
-    return this.battler().isConfused();
-};
-
-Game_BattlerTS.prototype.isRestricted = function() {
-    return this.battler().isRestricted();
 };
 
 //-----------------------------------------------------------------------------
@@ -1710,8 +1698,9 @@ Game_EnemyTS.prototype.constructor = Game_EnemyTS;
 
 Game_EnemyTS.prototype.initialize = function(event, enemyId) {
     Game_BattlerTS.prototype.initialize.call(this, event);
-    this._enemy = new Game_Enemy(enemyId, event.x, event.y); // to do
-    this._char = new Game_Character();
+    this._enemy = new Game_Enemy(enemyId, event.x, event.y); // to do x and y
+    this._char = new Game_Character();  // it's used to calculate the shortest path
+    this._char.setImage('actpr1', 1);
     this.setMove($dataEnemies[enemyId]);
     this.setAggro($dataEnemies[enemyId], event);
 };
@@ -1754,7 +1743,7 @@ Game_EnemyTS.prototype.findTarget = function() {
             return this.battler().isActionValid(a);
         }, this);
         var sum = actionList.reduce(function(r, a) {
-            return r + a.rating * 3;
+            return r + a.rating * 3; // to do
         }, 0);
         if (sum > rate) {
             rate = sum;
@@ -1769,7 +1758,7 @@ Game_EnemyTS.prototype.findTarget = function() {
 Game_EnemyTS.prototype.findBestMove = function() {
     var target = this.findTarget();
     var pos = new Point(this.x, this.y);
-    this._char.setPosition(this.x, this.y)
+    this._char.setPosition(this.x, this.y);
     while (!this.isPosFound(this._char.x, this._char.y, pos, target)) {
         pos = new Point(this._char.x, this._char.y);
         var direction = this._char.findDirectionTo(target.x, target.y);
@@ -1924,7 +1913,7 @@ Game_PartyTS.prototype.maxBattleMembers = function() {
 
 Game_PartyTS.prototype.restrictedMembers = function() {
     return this.members().filter(function(member) {
-        return member.isRestricted();
+        return member.battler().isRestricted();
     }, this);
 };
 
@@ -2889,7 +2878,7 @@ Game_Action.prototype.range = function() {
 var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
 Game_BattlerBase.prototype.canUse = function(item) {
     if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
-        if (!this.isItemRangeValid(item)) {
+        if (!this.isItemRangeValid(item) && !this.isConfused()) {
             return false;
         }
     }
@@ -2912,10 +2901,6 @@ Game_BattlerBase.prototype.isOccasionOk = function(item) {
 
 Game_Actor.prototype.friendsUnitTS = function() {
     return $gamePartyTS;
-};
-
-Game_Actor.prototype.isSpriteVisible = function() {
-    return $gameSystem.isSideView();
 };
 
 Game_Enemy.prototype.friendsUnitTS = function() {
@@ -2950,15 +2935,6 @@ Game_Troop.prototype.setupTS = function(enemies) {
 
 Game_Troop.prototype.increaseTurn = function() {
     this._turnCount++;
-};
-
-Game_CharacterBase.prototype.isCollidedWithEvents = function(x, y) {
-    // for an character to pass through an actor
-    // it's used to calculate the shortest path
-    var events = $gameMap.eventsXyNt(x, y);
-    return events.some(function(event) {
-        return event.isNormalPriority() && isNaN(parseInt(event.meta()["actor"]));
-    });
 };
 
 Game_Character.prototype.searchLimit = function() {
