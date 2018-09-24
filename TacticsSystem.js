@@ -759,7 +759,7 @@ BattleManagerTS.updateEnemyPhase = function() {
     this._subject = this.getNextEnemy();
     this._subject.updateRange();
     $gameTroop.setupTS([this.subject()]);
-    var pos = this._subject.findBestMove();
+    var pos = this._subject.makeMove();
     $gameSelectorTS.performTransfer(pos.x, pos.y);
     this.subject().makeActions();
     this._phase = 'move';
@@ -1730,6 +1730,28 @@ Game_EnemyTS.prototype.friendsUnit = function() {
     return $gameTroopTS;
 };
 
+Game_BattlerTS.prototype.makeMove = function() {
+    if (this.battler().isConfused()) {
+        return this.makeConfusionMove();
+    } else {
+        return this.findBestMove();
+    }
+};
+
+Game_EnemyTS.prototype.findBestMove = function() {
+    var target = this.findTarget();
+    var pos = new Point(this.x, this.y);
+    this._char.setPosition(this.x, this.y);
+    while (!this.isPosFound(this._char.x, this._char.y, pos, target)) {
+        pos = new Point(this._char.x, this._char.y);
+        var direction = this._char.findDirectionTo(target.x, target.y);
+        this._char.moveStraight(direction);
+    }
+    this._x = pos.x;
+    this._y = pos.y;
+    return pos;
+};
+
 Game_EnemyTS.prototype.findTarget = function() {
     var rate = 0;
     var x = this.x;
@@ -1753,20 +1775,6 @@ Game_EnemyTS.prototype.findTarget = function() {
     this._x = x;
     this._y = y;
     return target;
-};
-
-Game_EnemyTS.prototype.findBestMove = function() {
-    var target = this.findTarget();
-    var pos = new Point(this.x, this.y);
-    this._char.setPosition(this.x, this.y);
-    while (!this.isPosFound(this._char.x, this._char.y, pos, target)) {
-        pos = new Point(this._char.x, this._char.y);
-        var direction = this._char.findDirectionTo(target.x, target.y);
-        this._char.moveStraight(direction);
-    }
-    this._x = pos.x;
-    this._y = pos.y;
-    return pos;
 };
 
 Game_EnemyTS.prototype.isPosFound = function(x, y, pos, target) {
