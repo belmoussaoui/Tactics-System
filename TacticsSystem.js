@@ -640,7 +640,7 @@ BattleManagerTS.startTurn = function() {
 };
 
 BattleManagerTS.makePlayersOrder = function() {
-    var battlers = $gamePartyTS.restrictedMembers();
+    var battlers = $gamePartyTS.confusedMembers();
     // agiliy sort...
     this._playersOrder = battlers;
 };
@@ -1919,9 +1919,9 @@ Game_PartyTS.prototype.maxBattleMembers = function() {
     return this._maxBattleMembers;
 };
 
-Game_PartyTS.prototype.restrictedMembers = function() {
+Game_PartyTS.prototype.confusedMembers = function() {
     return this.members().filter(function(member) {
-        return member.battler().isRestricted();
+        return member.battler().isConfused();
     }, this);
 };
 
@@ -3012,7 +3012,7 @@ Game_Interpreter.prototype.updateWaitMode = function() {
 
 var Window_BattleLog_showNormalAnimationTS = Window_BattleLog.prototype.showNormalAnimation;
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
-    if ($gameParty.inBattleTS()  && !$gameParty.inBattle()) {
+    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
         var animation = $dataAnimations[animationId];
         if (animation) {
             targets.forEach(function(target) {
