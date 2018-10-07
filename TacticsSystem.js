@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.3.3
+// TacticsSystem.js v0.4
 //=============================================================================
 
 /*:
@@ -46,6 +46,14 @@
  * @desc Show the icon state of a unit. 0: False, 1: True
  * @default 1
  *
+ * @param show phase sprite
+ * @desc Show the phase sprite. 0: False, 1: True
+ * @default 1
+ *
+ * @param duration phase sprite
+ * @desc The duration to display the phase sprite.
+ * @default 120
+ *
  * @help
  *
  * For more information, please consult :
@@ -57,18 +65,20 @@
 var TacticsSystem = TacticsSystem || {};
 TacticsSystem.Parameters = PluginManager.parameters('TacticsSystem');
 
-TacticsSystem.cursorSpeed =        Number(TacticsSystem.Parameters['cursor speed']);
-TacticsSystem.gridOpacity =        Number(TacticsSystem.Parameters['grid opacity']);
-TacticsSystem.movePoints =         Number(TacticsSystem.Parameters['move points']);
-TacticsSystem.actionRange =        String(TacticsSystem.Parameters['action range']);
-TacticsSystem.moveScopeColor =     String(TacticsSystem.Parameters['move scope color']);
-TacticsSystem.allyScopeColor =     String(TacticsSystem.Parameters['ally scope color']);
-TacticsSystem.enemyScopeColor =    String(TacticsSystem.Parameters['enemy scope color']);
-TacticsSystem.animationIdOfDeath = String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.animationIdOfDeath = String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.animationIdOfDeath = String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.showHpGauge =        Number(TacticsSystem.Parameters['show hp gauge']);
-TacticsSystem.showStateIcon =      Number(TacticsSystem.Parameters['show state icon']);
+TacticsSystem.cursorSpeed =         Number(TacticsSystem.Parameters['cursor speed']);
+TacticsSystem.gridOpacity =         Number(TacticsSystem.Parameters['grid opacity']);
+TacticsSystem.movePoints =          Number(TacticsSystem.Parameters['move points']);
+TacticsSystem.actionRange =         String(TacticsSystem.Parameters['action range']);
+TacticsSystem.moveScopeColor =      String(TacticsSystem.Parameters['move scope color']);
+TacticsSystem.allyScopeColor =      String(TacticsSystem.Parameters['ally scope color']);
+TacticsSystem.enemyScopeColor =     String(TacticsSystem.Parameters['enemy scope color']);
+TacticsSystem.animationIdOfDeath =  String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.animationIdOfDeath =  String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.animationIdOfDeath =  String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.showHpGauge =         Number(TacticsSystem.Parameters['show hp gauge']);
+TacticsSystem.showStateIcon =       Number(TacticsSystem.Parameters['show state icon']);
+TacticsSystem.showPhaseSprite =     Number(TacticsSystem.Parameters['show phase sprite']);
+TacticsSystem.durationPhaseSprite = Number(TacticsSystem.Parameters['duration phase sprite']);
 
 //-----------------------------------------------------------------------------
 // Scene_BattleTS
@@ -292,7 +302,7 @@ Scene_BattleTS.prototype.commandAttack = function() {
     action.setAttack();
     BattleManagerTS.setupLocalBattle(action);
     BattleManagerTS.refreshRedCells(action);
-    this.selectEnemySelection();
+    this.onSelectAction();
 };
 
 Scene_BattleTS.prototype.commandSkill = function() {
@@ -572,17 +582,26 @@ BattleManagerTS.update = function() {
         case 'preparation':
             this.preparation();
             break;
+        case 'startPlayer':
+            this.startPlayerPhase();
+            break;
         case 'playerExplore':
             this.updateExplore();
             break;
         case 'playerSelect':
             this.updateSelect();
             break;
+        case 'startEnemy':
+            this.startEnemyPhase();
+            break;
         case 'move':
             this.updateMove();
             break;
         case 'action':
             this.updateAction();
+            break;
+        case 'endAction':
+            this.endBattlePhase();
             break;
         case 'battleEnd':
             this.updateBattleEnd();
@@ -598,8 +617,7 @@ BattleManagerTS.isBusy = function() {
 
 BattleManagerTS.updateEvent = function() {
     switch (this._phase) {
-    case 'playerExplore':
-    case 'action':
+    case 'endAction':
         return this.updateEventMain();
     }
 };
@@ -623,7 +641,6 @@ BattleManagerTS.updateEventMain = function() {
 };
 
 BattleManagerTS.preparation = function() {
-    // to do
     this.startTurn();
 };
 
@@ -636,7 +653,8 @@ BattleManagerTS.startTurn = function() {
     this._logWindow.startTurn();
     this.makePlayersOrder();
     this.makeEnemiesOrder();
-    this.startPlayerPhase();
+    this._spriteset.startPhase('Player Phase');
+    this._phase = 'startPlayer';
 };
 
 BattleManagerTS.makePlayersOrder = function() {
@@ -661,7 +679,7 @@ BattleManagerTS.getNextEnemy = function() {
 
 BattleManagerTS.startPlayerPhase = function() {
     this._subject = this.getNextPlayer();
-    if (this._subject) { // restrictionPhase
+    if (this._subject) {
         this.updatePlayerPhase();
     } else if (this.isPlayerPhase()) {
         $gameTroopTS.updateRange();
@@ -739,7 +757,8 @@ BattleManagerTS.endPlayerPhase = function() {
         this._logWindow.displayAutoAffectedStatus(enemy);
         this._logWindow.displayRegeneration(enemy);
     }, this);
-    this.startEnemyPhase();
+    this._spriteset.startPhase('Enemy Phase');
+    this._phase = 'startEnemy';
 };
 
 BattleManagerTS.startEnemyPhase = function() {
@@ -789,7 +808,7 @@ BattleManagerTS.processAction = function() {
         this._logWindow.displayAutoAffectedStatus(subject);
         this._logWindow.displayCurrentState(subject);
         this._logWindow.displayRegeneration(subject);
-        this.endBattlePhase();
+        this._phase = 'endAction';
     }
 };
 
@@ -819,7 +838,8 @@ BattleManagerTS.updateAction = function() {
         BattleManagerTS.performTransfer(battler);
         this.invokeAction(this.subject(), target);
     } else {
-        this.endAction();
+        this._logWindow.endAction(this.subject());
+        this.processAction();
     }
 };
 
@@ -872,14 +892,9 @@ BattleManagerTS.checkSubstitute = function(target) {
     return target.isDying() && !this._action.isCertainHit();
 };
 
-BattleManagerTS.endAction = function() {
-    this._spriteset.removeRedCells();
-    this._logWindow.endAction(this.subject());
-    this.processAction();
-};
-
 BattleManagerTS.endBattlePhase = function() {
     this._subject.endAction();
+    this._spriteset.removeRedCells();
     if (this._subject.isActor()) {
         this.startPlayerPhase();
     } else {
@@ -1700,7 +1715,6 @@ Game_EnemyTS.prototype.initialize = function(event, enemyId) {
     Game_BattlerTS.prototype.initialize.call(this, event);
     this._enemy = new Game_Enemy(enemyId, event.x, event.y); // to do x and y
     this._char = new Game_Character();  // it's used to calculate the shortest path
-    this._char.setImage('actpr1', 1);
     this.setMove($dataEnemies[enemyId]);
     this.setAggro($dataEnemies[enemyId], event);
 };
@@ -1765,7 +1779,7 @@ Game_EnemyTS.prototype.findTarget = function() {
             return this.battler().isActionValid(a);
         }, this);
         var sum = actionList.reduce(function(r, a) {
-            return r + a.rating * 3; // to do
+            return r + a.rating * 3;
         }, 0);
         if (sum > rate) {
             rate = sum;
@@ -2127,7 +2141,7 @@ Window_BattleTargetTS.prototype.processCursorMove = function () {
 
 Window_BattleTargetTS.prototype.onTouch = function(triggered) {
     var lastIndex = this.index();
-    Window_Selectable.prototype.onTouch.call(this);
+    Window_Selectable.prototype.onTouch.call(this, triggered);
     if (this.index() !== lastIndex) {
         BattleManagerTS.performTransfer(this.target());
     }
@@ -2455,6 +2469,7 @@ Spriteset_MapTS.prototype.initialize = function() {
     Spriteset_Map.prototype.initialize.call(this);
     this.createActors();
     this.createEnemies();
+    this.createPhase();
     this._blueCells = [];
     this._redCells = [];
 };
@@ -2565,6 +2580,9 @@ Spriteset_MapTS.prototype.isAnimationPlaying = function() {
             return true;
         }
     }
+    if (this._phaseSprite.isPlaying()) {
+        return true;
+    }
     return false;
 };
 
@@ -2581,6 +2599,16 @@ Spriteset_MapTS.prototype.isAnyoneMoving = function() {
 
 Spriteset_MapTS.prototype.isEffecting = function() {
     return false;
+};
+
+Spriteset_MapTS.prototype.createPhase = function() {
+    this._phaseSprite = new Sprite_PhaseTS();
+    this.addChild(this._phaseSprite);
+};
+
+Spriteset_MapTS.prototype.startPhase = function(phase) {//phase
+    //if (...)
+    this._phaseSprite.setup(phase);
 };
 
 //-----------------------------------------------------------------------------
@@ -2722,7 +2750,6 @@ Sprite_HpGaugeTS.prototype.update = function(battler) {
     this.bitmap.clear();
     if (this._battler.isAlive()) {
         this.drawBattlerHP();
-       // this.drawBattlerState();
     }
 };
 
@@ -2744,6 +2771,94 @@ Sprite_HpGaugeTS.prototype.drawBattlerState = function() {
     var color1 = this.hpGaugeColor1();
     var color2 = this.hpGaugeColor2();
     this.drawIcon(0, 0, width, this._battler.hpRate(), color1, color2)
+};
+
+//-----------------------------------------------------------------------------
+// Sprite_PhaseTS
+//
+// The sprite for displaying the current phase.
+
+function Sprite_PhaseTS() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_PhaseTS.prototype = Object.create(Sprite_Base.prototype);
+Sprite_PhaseTS.prototype.constructor = Sprite_PhaseTS;
+
+Sprite_PhaseTS.prototype.initialize = function() {
+    Sprite_Base.prototype.initialize.call(this);
+    this.bitmap = new Bitmap(Graphics.width, Graphics.height);
+    this._delay = 0;
+    this._duration = 0;
+    this.z = 8;
+    this.opacity = 0;
+};
+
+
+Sprite_PhaseTS.prototype.maxDuration = function() {
+    return TacticsSystem.durationPhaseSprite || 120;
+};
+
+Sprite_PhaseTS.prototype.setupDuration = function(duration) {
+    this._duration = this.maxDuration();
+};
+
+Sprite_PhaseTS.prototype.update = function(battler) {
+    Sprite_Base.prototype.update.call(this);
+    this.updateMain();
+    this.updatePosition();
+    this.updateOpacity();
+};
+
+Sprite_PhaseTS.prototype.isPlaying = function() {
+    return this._duration > 0;
+};
+
+Sprite_PhaseTS.prototype.updateMain = function() {
+    if (this.isPlaying()) {
+        this._duration--;
+        this.updatePosition();
+    } else {
+        this.hide();
+    }
+};
+
+Sprite_PhaseTS.prototype.updatePosition = function() {
+    this.x = Graphics.width / 2 - this.bitmap.width / 2;
+    this.y = Graphics.height / 2 - this.bitmap.height / 2 - 120;
+};
+
+Sprite_PhaseTS.prototype.updateBitmap = function() {
+};
+
+Sprite_PhaseTS.prototype.setup = function(phase) {
+    if (TacticsSystem.showPhaseSprite) {
+        this.drawPhase(phase);
+    }
+    this.setupDuration();
+};
+
+Sprite_PhaseTS.prototype.updateOpacity = function() {
+    if (this._duration < 30) {
+        this.opacity = 255 * this._duration / 30;
+    }
+    if (this._duration > this.maxDuration() - 60) {
+        this.opacity = 255 * (this.maxDuration() - this._duration ) / 60;
+    }
+};
+
+Sprite_PhaseTS.prototype.drawPhase = function(phase) {
+    var x = 20;
+    var y = Graphics.height / 2;
+    var maxWidth = Graphics.width - x * 2;
+    var text = phase;
+    this.bitmap.clear();
+    this.bitmap.outlineColor = 'black';
+    this.bitmap.outlineWidth = 8;
+    this.bitmap.fontSize = 72;
+    this.bitmap.drawText(text, x, y, maxWidth, 48, 'center');
+    this.opacity = 255;
+    this.show();
 };
 
 //-----------------------------------------------------------------------------
@@ -2925,7 +3040,7 @@ Game_Party.prototype.setupTS = function(actors) {
 };
 
 Game_Party.prototype.maxBattleMembers = function() {
-    return this._maxBattleMembers;  // remettre 4 a la fin !
+    return this._maxBattleMembers;
 };
 
 Game_Party.prototype.members = function() {
@@ -2959,10 +3074,10 @@ Game_Event.prototype.initialize = function(mapId, eventId) {
 var Game_Event_isCollidedWithEventsTS = Game_Event.prototype.isCollidedWithEvents;
 Game_Event.prototype.isCollidedWithEvents = function(x, y) {
     // for an actor to pass through an actor
-    if (!isNaN(parseInt(this.meta()["actor"]))) {
+    if (this.isActorTS()) {
         var events = $gameMap.eventsXyNt(x, y);
         return events.some(function(event) {
-            return event.isNormalPriority() && isNaN(parseInt(event.meta()["actor"]));
+            return event.isNormalPriority() && !event.isActorTS();
         });
     } else {
         return Game_Event_isCollidedWithEventsTS.call(this, x, y);
