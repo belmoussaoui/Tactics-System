@@ -299,6 +299,7 @@ Scene_BattleTS.prototype.startActorCommandSelection = function() {
 
 Scene_BattleTS.prototype.commandAttack = function() {
     var action = BattleManagerTS.inputtingAction();
+    console.log(action);
     action.setAttack();
     BattleManagerTS.setupLocalBattle(action);
     BattleManagerTS.refreshRedCells(action);
@@ -478,6 +479,7 @@ Scene_BattleTS.prototype.needsSlowFadeOut = function() {
 
 Scene_BattleTS.prototype.terminate = function() {
     Scene_Base.prototype.terminate.call(this);
+    BattleManagerTS.terminate();
 };
 
 //-----------------------------------------------------------------------------
@@ -658,7 +660,7 @@ BattleManagerTS.startTurn = function() {
 };
 
 BattleManagerTS.makePlayersOrder = function() {
-    var battlers = $gamePartyTS.confusedMembers();
+    var battlers = $gamePartyTS.restrictedMembers();
     // agiliy sort...
     this._playersOrder = battlers;
 };
@@ -1744,9 +1746,11 @@ Game_EnemyTS.prototype.friendsUnit = function() {
     return $gameTroopTS;
 };
 
-Game_BattlerTS.prototype.makeMove = function() {
+Game_EnemyTS.prototype.makeMove = function() {
     if (this.battler().isConfused()) {
         return this.makeConfusionMove();
+    } else if (!this.battler().canMove()) {
+        return new Point(this.x, this.y);
     } else {
         return this.findBestMove();
     }
@@ -1933,9 +1937,9 @@ Game_PartyTS.prototype.maxBattleMembers = function() {
     return this._maxBattleMembers;
 };
 
-Game_PartyTS.prototype.confusedMembers = function() {
+Game_PartyTS.prototype.restrictedMembers = function() {
     return this.members().filter(function(member) {
-        return member.battler().isConfused();
+        return member.battler().isRestricted();
     }, this);
 };
 
@@ -2479,8 +2483,10 @@ Spriteset_MapTS.prototype.createCharacters = function() {
     $gameMap.events().forEach(function(event) {
         var sprite = null;
         if (event.isActorTS() || event.isEnemyTS()) {
+            console.log(event);
             sprite = new Sprite_BattlerTS(event);
         } else {
+            console.log(event);
             sprite = new Sprite_Character(event);
         }
         this._characterSprites.push(sprite);
@@ -3001,7 +3007,7 @@ Game_Action.prototype.range = function() {
 var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
 Game_BattlerBase.prototype.canUse = function(item) {
     if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
-        if (!this.isItemRangeValid(item) && !this.isConfused()) {
+        if (!this.isItemRangeValid(item)) {
             return false;
         }
     }
