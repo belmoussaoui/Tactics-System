@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.0.0-a
+// TacticsSystem.js v0.4.0.1
 //=============================================================================
 
 /*:
@@ -299,7 +299,6 @@ Scene_BattleTS.prototype.startActorCommandSelection = function() {
 
 Scene_BattleTS.prototype.commandAttack = function() {
     var action = BattleManagerTS.inputtingAction();
-    console.log(action);
     action.setAttack();
     BattleManagerTS.setupLocalBattle(action);
     BattleManagerTS.refreshRedCells(action);
@@ -493,10 +492,12 @@ function BattleManagerTS() {
 
 BattleManagerTS.setup = function() {
     this.initMembers();
-    $gamePlayer.setThrough(true);
     $gameScreen.onBattleStart();
     $gameTroop.clear();
     this.createGameObjects();
+    var x = $gamePlayer.x;
+    var y = $gamePlayer.y;
+    $gameSelectorTS.setPosition(x, y);
 };
 
 BattleManagerTS.initMembers = function() {
@@ -548,9 +549,7 @@ BattleManagerTS.createGameEnemies = function(enemies, event) {
 };
 
 BattleManagerTS.startBattle = function() {
-    var x = $gamePlayer.x;
-    var y = $gamePlayer.y;
-    $gameSelectorTS.setPosition(x, y);
+    $gamePlayer.setThrough(true);
     this._spriteset.createGrid()
 };
 
@@ -619,6 +618,8 @@ BattleManagerTS.isBusy = function() {
 
 BattleManagerTS.updateEvent = function() {
     switch (this._phase) {
+    case 'startPlayer':
+    case 'startEnemy':
     case 'endAction':
         return this.updateEventMain();
     }
@@ -666,7 +667,7 @@ BattleManagerTS.makePlayersOrder = function() {
 };
 
 BattleManagerTS.makeEnemiesOrder = function() {
-    var battlers = $gameTroopTS.members();
+    var battlers = $gameTroopTS.aliveMembers();
     // agility sort...
     this._enemiesOrder = battlers;
 };
@@ -684,8 +685,6 @@ BattleManagerTS.startPlayerPhase = function() {
     if (this._subject) {
         this.updatePlayerPhase();
     } else if (this.isPlayerPhase()) {
-        $gameTroopTS.updateRange();
-        $gamePartyTS.updateRange();
         this.refreshBlueCells();
         this._phase = 'playerExplore';
     } else {
@@ -712,6 +711,7 @@ BattleManagerTS.updateExplore = function() {
     if (this.canSelectActor($gameSelectorTS.select())) {
         SoundManager.playOk();
         this._subject = $gameSelectorTS.select();
+        this._subject.updateRange();
         this._subject.savePosition();
         $gameParty.setupTS([this._subject.battler()]);
         this._phase = 'playerSelect';
@@ -719,8 +719,11 @@ BattleManagerTS.updateExplore = function() {
 };
 
 BattleManagerTS.updateSelect = function() {
-    if ($gameSelectorTS.isOnBlueCells(this._subject.blueCells())) {
-        if (this.canExecuteMove($gameSelectorTS.select())) {
+    var x = $gameSelectorTS.x;
+    var y = $gameSelectorTS.y;
+    var select = $gameSelectorTS.select();
+    if ($gameMap.isOnTiles(x, y)) {
+        if (this.canExecuteMove(select)) {
             SoundManager.playOk();
             this._spriteset.removeBlueCells();
             this._phase = 'move';
@@ -898,9 +901,9 @@ BattleManagerTS.endBattlePhase = function() {
     this._subject.endAction();
     this._spriteset.removeRedCells();
     if (this._subject.isActor()) {
-        this.startPlayerPhase();
+        this._phase = 'startPlayer';
     } else {
-        this.startEnemyPhase();
+        this._phase = 'startEnemy';
     }
 };
 
@@ -909,7 +912,8 @@ BattleManagerTS.refreshBlueCells = function() {
         this._spriteset.removeBlueCells();
         var subject = $gameSelectorTS.select();
         if (this.canShowBlueCells(subject)) {
-            this._spriteset.createBlueCells(subject.blueCells());
+            subject.updateRange();
+            this._spriteset.createBlueCells();
         }
     }
 };
@@ -976,7 +980,7 @@ BattleManagerTS.processVictory = function() {
 BattleManagerTS.processDefeat = function() {
     this.displayDefeatMessage();
     this.playDefeatMe();
-    if (this._canLose) {
+    if (this._canLose) { // fix this
         this.replayBgmAndBgs();
     } else {
         AudioManager.stopBgm();
@@ -1386,18 +1390,6 @@ Game_SelectorTS.prototype.triggerTouchAction = function() {
     return false;
 };
 
-Game_SelectorTS.prototype.isOnBlueCells = function(blueCells) {
-    for (var i = 0; i < blueCells.length; i++) {
-        var blueCell = blueCells[i];
-        var x = blueCell.x;
-        var y = blueCell.y;
-        if (this.pos(x, y)) {
-            return true;
-        }
-    }
-    return false;
-};
-
 //-----------------------------------------------------------------------------
 // Game_BattlerTS
 //
@@ -1464,55 +1456,8 @@ Game_BattlerTS.prototype.defaultDirection = function() {
     this._event.setDirection(2);
 };
 
-Game_BattlerTS.prototype.blueCells = function() {
-    return this._blueCells;
-};
-
 Game_BattlerTS.prototype.updateRange = function() {
-    this._blueCells = this.createMoveRange(this._move);
-};
-
-Game_BattlerTS.prototype.createMoveRange = function(move) {
-    var start = [new Point(this.x, this.y)]
-    var range = [new Point(this.x, this.y)];
-    for (var i = 0; i < move; i++) {
-        var temp = [];
-        for (var j = 0; j < start.length; j++) {
-            var nextCells = this.nextCells(start[j], range);
-            range = range.concat(nextCells);
-            temp = temp.concat(nextCells);
-        }
-        start = JsonEx.makeDeepCopy(temp);
-    }
-    return range
-};
-
-Game_BattlerTS.prototype.nextCells = function (start, range) {
-    var x = start.x;
-    var y = start.y;
-    var nextCells = [];
-    for (var d = 8; d >= 2; d -= 2) {
-        if (this._event.canPass(x, y, d)) {
-            var x2 = $gameMap.roundXWithDirection(x, d);
-            var y2 = $gameMap.roundYWithDirection(y, d);
-            if (this.isMoveValid(x2, y2, range)) {
-                nextCells.push(new Point(x2, y2));
-            }
-        }
-    }
-    return nextCells;
-};
-
-Game_BattlerTS.prototype.isMoveValid = function (x, y, range) {
-    for (var i = 0; i < range.length; i++) {
-        var pos = range[i];
-        var x2 = pos.x;
-        var y2 = pos.y;
-        if (x === x2 && y === y2) {
-            return false;
-        }
-    }
-    return true;
+    this._event.tilesRange(this._move);
 };
 
 Game_BattlerTS.prototype.moveStraightTo = function(x, y) {
@@ -1592,8 +1537,8 @@ Game_BattlerTS.prototype.makeConfusionMove = function() {
     var action = new Game_Action(this.battler());
     action.setConfusion();
     var target = [new Point(this.x, this.y)];
-    for (var i = 0; i < this.blueCells().length; i++) {
-        var temp = this.blueCells()[i];
+    for (var i = 0; i < $gameMap.tiles().length; i++) {
+        var temp = $gameMap.tiles()[i];
         this._x = temp.x;
         this._y = temp.y;
         if (this.battler().canUse(action.item()) && this.isConfusedRangeOk(action)) {
@@ -1715,7 +1660,7 @@ Game_EnemyTS.prototype.constructor = Game_EnemyTS;
 
 Game_EnemyTS.prototype.initialize = function(event, enemyId) {
     Game_BattlerTS.prototype.initialize.call(this, event);
-    this._enemy = new Game_Enemy(enemyId, event.x, event.y); // to do x and y
+    this._enemy = new Game_Enemy(enemyId, 0, 0); // to do x and y
     this._char = new Game_Character();  // it's used to calculate the shortest path
     this.setMove($dataEnemies[enemyId]);
     this.setAggro($dataEnemies[enemyId], event);
@@ -1728,10 +1673,6 @@ Game_EnemyTS.prototype.setAggro = function(object, event) {
 
 Game_EnemyTS.prototype.aggro = function() {
     return this._aggro;
-};
-
-Game_EnemyTS.prototype.aggroCells = function() {
-    return this._aggroCells;
 };
 
 Game_EnemyTS.prototype.battler = function() {
@@ -1757,7 +1698,10 @@ Game_EnemyTS.prototype.makeMove = function() {
 };
 
 Game_EnemyTS.prototype.findBestMove = function() {
+    this._event.tilesRange(this._aggro);
     var target = this.findTarget();
+    console.log(this._move);
+    this._event.tilesRange(this._move);
     var pos = new Point(this.x, this.y);
     this._char.setPosition(this.x, this.y);
     while (!this.isPosFound(this._char.x, this._char.y, pos, target)) {
@@ -1775,15 +1719,15 @@ Game_EnemyTS.prototype.findTarget = function() {
     var x = this.x;
     var y = this.y;
     var target = new Point(this.x, this.y);
-    for (var i = 0; i < this.aggroCells().length; i++) {
-        var temp = this.aggroCells()[i];
-        this._x = temp.x;
-        this._y = temp.y;
+    for (var i = 0; i < $gameMap.tiles().length; i++) {
+        var tile = $gameMap.tiles()[i];
+        this._x = $gameMap.positionTileX(tile);
+        this._y = $gameMap.positionTileY(tile);
         var actionList = this.battler().enemy().actions.filter(function(a) {
             return this.battler().isActionValid(a);
         }, this);
         var sum = actionList.reduce(function(r, a) {
-            return r + a.rating * 3;
+            return r + a.rating * 3;  // * 3 !
         }, 0);
         if (sum > rate) {
             rate = sum;
@@ -1796,28 +1740,11 @@ Game_EnemyTS.prototype.findTarget = function() {
 };
 
 Game_EnemyTS.prototype.isPosFound = function(x, y, pos, target) {
-    return !this.isOnBlueCells(x, y) || this.isOnTarget(pos, target);
-};
-
-Game_EnemyTS.prototype.isOnBlueCells= function(x, y) {
-    for (var i = 0; i < this.blueCells().length; i++) {
-        var pos = this.blueCells()[i];
-        var x2 = pos.x;
-        var y2 = pos.y;
-        if (x === x2 && y === y2) {
-            return true;
-        }
-    }
-    return false;
+    return !$gameMap.isOnTiles(x, y) || this.isOnTarget(pos, target);
 };
 
 Game_EnemyTS.prototype.isOnTarget = function(pos, target) {
     return pos.x === target.x && pos.y === target.y;
-};
-
-Game_EnemyTS.prototype.updateRange = function() {
-    this._blueCells = this.createMoveRange(this._move);
-    this._aggroCells = this.createMoveRange(this._aggro);
 };
 
 //-----------------------------------------------------------------------------
@@ -1861,12 +1788,6 @@ Game_UnitTS.prototype.isAllDead = function() {
 Game_UnitTS.prototype.onTurnStart = function() {
     this.members().forEach(function(member) {
         member.onTurnStart();
-    });
-};
-
-Game_UnitTS.prototype.updateRange = function() {
-    this.members().forEach(function(member) {
-        member.updateRange();
     });
 };
 
@@ -1939,7 +1860,7 @@ Game_PartyTS.prototype.maxBattleMembers = function() {
 
 Game_PartyTS.prototype.restrictedMembers = function() {
     return this.members().filter(function(member) {
-        return member.battler().isRestricted();
+        return member.battler().isRestricted() && member.isAlive();
     }, this);
 };
 
@@ -2483,10 +2404,8 @@ Spriteset_MapTS.prototype.createCharacters = function() {
     $gameMap.events().forEach(function(event) {
         var sprite = null;
         if (event.isActorTS() || event.isEnemyTS()) {
-            console.log(event);
             sprite = new Sprite_BattlerTS(event);
         } else {
-            console.log(event);
             sprite = new Sprite_Character(event);
         }
         this._characterSprites.push(sprite);
@@ -2520,11 +2439,12 @@ Spriteset_MapTS.prototype.battlerSprites = function() {
     return this._enemySprites.concat(this._actorSprites);
 };
 
-Spriteset_MapTS.prototype.createBlueCells = function(blueCells) {
+Spriteset_MapTS.prototype.createBlueCells = function() {
     this._blueCells = [];
-    for (var i = 0; i < blueCells.length; i++) {
-        var x = blueCells[i].x;
-        var y = blueCells[i].y;
+    for (var i = 0; i < $gameMap.tiles().length; i++) {
+        var tile = $gameMap.tiles()[i];
+        var x = $gameMap.positionTileX(tile);
+        var y = $gameMap.positionTileY(tile);
         var color = TacticsSystem.moveScopeColor || '#0066CC';
         var cell = this.createColorCell(x, y, color);
         this._blueCells.push(cell);
@@ -2868,9 +2788,9 @@ Sprite_PhaseTS.prototype.drawPhase = function(phase) {
 };
 
 //-----------------------------------------------------------------------------
-// Miscellaneous
+// Scene_Map
 //
-// Rewrite and extension of some methodes
+// The scene class of the map screen.
 
 var Scene_Map_stopTS = Scene_Map.prototype.stop;
 Scene_Map.prototype.stop = function() {
@@ -2888,6 +2808,11 @@ Scene_Map.prototype.update = function() {
     }
 };
 
+//-----------------------------------------------------------------------------
+// DataManager
+//
+// The static class that manages the database and game objects.
+
 var DataManager_createGameObjectsTS = DataManager.createGameObjects;
 DataManager.createGameObjects = function() {
     $gameSelectorTS =     new Game_SelectorTS();
@@ -2895,6 +2820,11 @@ DataManager.createGameObjects = function() {
     $gamePartyTS =        new Game_PartyTS();
     DataManager_createGameObjectsTS.call();
 };
+
+//-----------------------------------------------------------------------------
+// Game_Temp
+//
+// The game object class for temporary data that is not included in save data.
 
 var Game_Temp_initializeTS = Game_Temp.prototype.initialize;
 Game_Temp.prototype.initialize = function() {
@@ -2929,6 +2859,11 @@ Game_Temp.prototype.positionX = function() {
 Game_Temp.prototype.positionY = function() {
     return this._positionY;
 };
+
+//-----------------------------------------------------------------------------
+// Game_Action
+//
+// The game object class for a battle action.
 
 Game_Action.prototype.battleOpponentsUnit = function(subject) {
     var units = subject.opponentsUnit().aliveMembers();
@@ -3004,15 +2939,10 @@ Game_Action.prototype.range = function() {
     return this._range;
 };
 
-var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
-Game_BattlerBase.prototype.canUse = function(item) {
-    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
-        if (!this.isItemRangeValid(item)) {
-            return false;
-        }
-    }
-    return Game_BattlerBase_canUseTS.call(this, item);
-};
+//-----------------------------------------------------------------------------
+// Game_BattlerBase
+//
+// The superclass of Game_Battler. It mainly contains parameters calculation.
 
 Game_BattlerBase.prototype.isItemRangeValid = function(item) {
     var friendsUnitTS = this.friendsUnitTS();
@@ -3028,13 +2958,39 @@ Game_BattlerBase.prototype.isOccasionOk = function(item) {
     }
 };
 
+var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
+Game_BattlerBase.prototype.canUse = function(item) {
+    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
+        if (!this.isItemRangeValid(item)) {
+            return false;
+        }
+    }
+    return Game_BattlerBase_canUseTS.call(this, item);
+};
+
+//-----------------------------------------------------------------------------
+// Game_Actor
+//
+// The game object class for an actor.
+
 Game_Actor.prototype.friendsUnitTS = function() {
     return $gamePartyTS;
 };
 
+//-----------------------------------------------------------------------------
+// Game_Enemy
+//
+// The game object class for an enemy.
+
 Game_Enemy.prototype.friendsUnitTS = function() {
     return $gameTroopTS;
 };
+
+//-----------------------------------------------------------------------------
+// Game_Party
+//
+// The game object class for the party. Information such as gold and items is
+// included.
 
 Game_Party.prototype.setupTS = function(actors) {
     var actorsId = [];
@@ -3057,6 +3013,11 @@ Game_Party.prototype.inBattleTS = function() {
     return $gamePartyTS.inBattleTS();
 };
 
+//-----------------------------------------------------------------------------
+// Game_Troop
+//
+// The game object class for a troop and the battle-related data.
+
 Game_Troop.prototype.setupTS = function(enemies) {
     this._enemies = enemies;
     //this.makeUniqueNames();
@@ -3066,9 +3027,64 @@ Game_Troop.prototype.increaseTurn = function() {
     this._turnCount++;
 };
 
+//-----------------------------------------------------------------------------
+// Game_Map
+//
+// The game object class for a map. It contains scrolling and passage
+// determination functions.
+
+var Game_Map_intializeTS = Game_Map.prototype.initialize;
+Game_Map.prototype.initialize = function() {
+    Game_Map_intializeTS.call(this);
+    this._tiles = [];
+};
+
+Game_Map.prototype.addTile = function(tile) {
+    return this._tiles.push(tile);
+};
+
+Game_Map.prototype.positionTileX = function(tile) {
+    return Math.floor(tile / $dataMap.width);
+};
+
+Game_Map.prototype.positionTileY = function(tile) {
+    return tile % $dataMap.width;
+};
+
+Game_Map.prototype.isTileAdded = function(tile) {
+    return this._tiles.contains(tile);
+};
+
+Game_Map.prototype.tile = function(x, y) {
+    return x * $dataMap.width + y;
+};
+
+Game_Map.prototype.tiles = function() {
+    return this._tiles;
+};
+
+Game_Map.prototype.eraseTiles = function() {
+    this._tiles = [];
+};
+
+Game_Map.prototype.isOnTiles = function(x, y) {
+    return this._tiles.contains(this.tile(x, y));
+};
+
+//-----------------------------------------------------------------------------
+// Game_Character
+//
+// The superclass of Game_Player, Game_Follower, GameVehicle, and Game_Event.
+
 Game_Character.prototype.searchLimit = function() {
     return 32; // 12 by default
 };
+
+//-----------------------------------------------------------------------------
+// Game_Event
+//
+// The game object class for an event. It contains functionality for event page
+// switching and running parallel process events.
 
 var Game_Event_initializeTS = Game_Event.prototype.initialize;
 Game_Event.prototype.initialize = function(mapId, eventId) {
@@ -3118,6 +3134,40 @@ Game_Event.prototype.battlerTS = function() {
     return this.isActorTS() ? $gamePartyTS.getBattlerTS(this) : $gameTroopTS.getBattlerTS(this);
 };
 
+Game_Event.prototype.tilesRange = function(distance) {
+    var queue = [];
+    var level = [];
+    var startTile = $gameMap.tile(this.x, this.y)
+    
+    $gameMap.eraseTiles();
+    queue.push(startTile);
+    level[startTile] = 0;
+    $gameMap.addTile(startTile);
+
+    while (queue.length && level[queue[0]] < distance) {
+        var start = queue.shift();
+        var x = $gameMap.positionTileX(start);
+        var y = $gameMap.positionTileY(start);
+        for (var d = 8; d >= 2; d -= 2) {
+            if (this.canPass(x, y, d)) {
+                var x2 = $gameMap.roundXWithDirection(x, d);
+                var y2 = $gameMap.roundYWithDirection(y, d);
+                var tile = $gameMap.tile(x2, y2);
+                if (!$gameMap.isTileAdded(tile)) {
+                    queue.push(tile);
+                    level[tile] = level[start] + 1;
+                    $gameMap.addTile(tile);
+                }
+            }
+        }
+    }
+};
+
+//-----------------------------------------------------------------------------
+// Game_Interpreter
+//
+// The interpreter for running event commands.
+
 var Game_Interpreter_updateWaitModeTS = Game_Interpreter.prototype.updateWaitMode;
 Game_Interpreter.prototype.updateWaitMode = function() {
     if (this._waitMode === 'battleTS') {
@@ -3130,6 +3180,12 @@ Game_Interpreter.prototype.updateWaitMode = function() {
         return Game_Interpreter_updateWaitModeTS.call(this);
     }
 };
+
+//-----------------------------------------------------------------------------
+// Window_BattleLog
+//
+// The window for displaying battle progress. No frame is displayed, but it is
+// handled as a window for convenience.
 
 var Window_BattleLog_showNormalAnimationTS = Window_BattleLog.prototype.showNormalAnimation;
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
@@ -3147,9 +3203,24 @@ Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, 
     }
 };
 
+//-----------------------------------------------------------------------------
+// Sprite_Character
+//
+// The sprite for displaying a character.
+
 Sprite_Character.prototype.character = function() {
     return this._character;
 };
+
+//-----------------------------------------------------------------------------
+/**
+ * The basic object that represents an image.
+ *
+ * @class Bitmap
+ * @constructor
+ * @param {Number} width The width of the bitmap
+ * @param {Number} height The height of the bitmap
+ */
 
 /**
  * Draw a line.
