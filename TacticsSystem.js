@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.0.1
+// TacticsSystem.js v0.4.0.2
 //=============================================================================
 
 /*:
@@ -228,9 +228,7 @@ Scene_BattleTS.prototype.update = function() {
     $gameMap.update(active);
     if (active && !this.isBusy()) {
         this.updateBattleProcess();
-        if ($gameSelectorTS.hadMoved()) {
-            this.updateStatusWindow();
-        }
+        this.updateStatusWindow();
     }
     $gameTimer.update(active);
     $gameScreen.update();
@@ -281,7 +279,7 @@ Scene_BattleTS.prototype.updateStatusWindow = function() {
 };
 
 Scene_BattleTS.prototype.canShowStatusWindow = function(select) {
-    return select && select.isAlive();
+    return select && select.isAlive() && BattleManagerTS.isExporation();
 };
 
 Scene_BattleTS.prototype.isAnyInputWindowActive = function() {
@@ -652,6 +650,7 @@ BattleManagerTS.startTurn = function() {
     $gameTroop.increaseTurn();
     $gameTroopTS.onTurnStart();
     $gamePartyTS.onTurnStart();
+    $gameSelectorTS.setTransparent(true);
     $gameSelectorTS.restorePosition();
     this._logWindow.startTurn();
     this.makePlayersOrder();
@@ -681,6 +680,7 @@ BattleManagerTS.getNextEnemy = function() {
 };
 
 BattleManagerTS.startPlayerPhase = function() {
+    $gameSelectorTS.setTransparent(false);
     this._subject = this.getNextPlayer();
     if (this._subject) {
         this.updatePlayerPhase();
@@ -711,7 +711,6 @@ BattleManagerTS.updateExplore = function() {
     if (this.canSelectActor($gameSelectorTS.select())) {
         SoundManager.playOk();
         this._subject = $gameSelectorTS.select();
-        this._subject.updateRange();
         this._subject.savePosition();
         $gameParty.setupTS([this._subject.battler()]);
         this._phase = 'playerSelect';
@@ -725,7 +724,7 @@ BattleManagerTS.updateSelect = function() {
     if ($gameMap.isOnTiles(x, y)) {
         if (this.canExecuteMove(select)) {
             SoundManager.playOk();
-            this._spriteset.removeBlueCells();
+            $gameMap.eraseTiles();
             this._phase = 'move';
         }
     }
@@ -751,11 +750,20 @@ BattleManagerTS.isInputting = function() {
     return this._phase === 'input';
 };
 
+BattleManagerTS.isExporation = function() {
+    return this._phase === 'playerExplore';
+};
+
+BattleManagerTS.isStartPhase = function() {
+    return this._phase === 'startPlayer' || this._phase === 'startEnemy';
+};
+
 BattleManagerTS.inputtingAction = function() {
     return this.subject().inputtingAction();
 };
 
 BattleManagerTS.endPlayerPhase = function() {
+    $gameSelectorTS.setTransparent(true);
     $gameSelectorTS.savePosition();
     $gameTroopTS.battlerMembers().forEach(function(enemy) {
         enemy.onTurnEnd();
@@ -767,6 +775,7 @@ BattleManagerTS.endPlayerPhase = function() {
 };
 
 BattleManagerTS.startEnemyPhase = function() {
+    $gameSelectorTS.setTransparent(false);
     this._subject = null;
     if (this.isEnemyPhase()) {
         this.updateEnemyPhase();
@@ -786,6 +795,7 @@ BattleManagerTS.updateEnemyPhase = function() {
     var pos = this._subject.makeMove();
     $gameSelectorTS.performTransfer(pos.x, pos.y);
     this.subject().makeActions();
+    $gameMap.eraseTiles();
     this._phase = 'move';
 };
 
@@ -899,7 +909,7 @@ BattleManagerTS.checkSubstitute = function(target) {
 
 BattleManagerTS.endBattlePhase = function() {
     this._subject.endAction();
-    this._spriteset.removeRedCells();
+    $gameMap.eraseTiles();
     if (this._subject.isActor()) {
         this._phase = 'startPlayer';
     } else {
@@ -909,11 +919,11 @@ BattleManagerTS.endBattlePhase = function() {
 
 BattleManagerTS.refreshBlueCells = function() {
     if ($gameSelectorTS.hadMoved()) {
-        this._spriteset.removeBlueCells();
+        $gameMap.eraseTiles();
         var subject = $gameSelectorTS.select();
         if (this.canShowBlueCells(subject)) {
+            $gameMap.setMoveColor();
             subject.updateRange();
-            this._spriteset.createBlueCells();
         }
     }
 };
@@ -926,13 +936,14 @@ BattleManagerTS.setupLocalBattle = function(action) {
 };
 
 BattleManagerTS.refreshRedCells = function(action) {
+    $gameMap.eraseTiles();
     BattleManagerTS.setupLocalBattle(action);
-    this._spriteset.removeRedCells();
-    this._spriteset.createRedCells(action);
+    $gameMap.setActionColor(action);
+    action.showRange();
 };
 
 BattleManagerTS.processCancel = function() {
-    this._spriteset.removeRedCells();
+    $gameMap.eraseTiles();
     var x = this._subject.x;
     var y = this._subject.y;
     $gameSelectorTS.performTransfer(x, y);
@@ -951,11 +962,13 @@ BattleManagerTS.selectPreviousCommand = function() {
 };
 
 BattleManagerTS.checkBattleEnd = function() {
-    if (this._phase) {
+    if (this._phase && BattleManagerTS.isStartPhase()) {
         if ($gamePartyTS.isAllDead()) {
+            $gameSelectorTS.setTransparent(true);
             this.processDefeat();
             return true;
         } else if ($gameTroopTS.isAllDead()) {
+            $gameSelectorTS.setTransparent(true);
             this.processVictory();
             return true;
         }
@@ -1168,6 +1181,7 @@ Game_SelectorTS.prototype.initMembers = function() {
     this._wait = 0;
     this._select = null;
     this._hadMoved = false;
+    this._transparent = false;
 };
 
 Game_SelectorTS.prototype.pos = function(x, y) {
@@ -1388,6 +1402,14 @@ Game_SelectorTS.prototype.triggerTouchAction = function() {
         }
     }
     return false;
+};
+
+Game_SelectorTS.prototype.setTransparent = function(transparent) {
+    this._transparent = transparent;
+};
+
+Game_SelectorTS.prototype.isTransparent = function() {
+    return this._transparent;
 };
 
 //-----------------------------------------------------------------------------
@@ -1700,7 +1722,6 @@ Game_EnemyTS.prototype.makeMove = function() {
 Game_EnemyTS.prototype.findBestMove = function() {
     this._event.tilesRange(this._aggro);
     var target = this.findTarget();
-    console.log(this._move);
     this._event.tilesRange(this._move);
     var pos = new Point(this.x, this.y);
     this._char.setPosition(this.x, this.y);
@@ -2307,32 +2328,14 @@ Sprite_SelectorTS.prototype.loadBitmap = function() {
 
 Sprite_SelectorTS.prototype.update = function() {
     Sprite_Base.prototype.update.call(this);
+    this.updateVisibility();
     this.x = $gameSelectorTS.screenX();
     this.y = $gameSelectorTS.screenY();
 };
 
-//-----------------------------------------------------------------------------
-// Sprite_CellTS
-//
-// The sprite for displaying a cell.
-
-function Sprite_CellTS() {
-    this.initialize.apply(this, arguments);
-};
-
-Sprite_CellTS.prototype = Object.create(Sprite_Base.prototype);
-Sprite_CellTS.prototype.constructor = Sprite_CellTS;
-
-Sprite_CellTS.prototype.initialize = function(x, y) {
-    Sprite_Base.prototype.initialize.call(this);
-    this._x = x;
-    this._y = y;
-};
-
-Sprite_CellTS.prototype.update = function() {
-    Sprite_Base.prototype.update.call(this);
-    this.x = Math.round($gameMap.adjustX(this._x) * 48);
-    this.y = Math.round($gameMap.adjustY(this._y) * 48);
+Sprite_SelectorTS.prototype.updateVisibility = function() {
+    Sprite_Base.prototype.updateVisibility.call(this);
+    this.visible = !$gameSelectorTS.isTransparent();
 };
 
 //-----------------------------------------------------------------------------
@@ -2395,8 +2398,50 @@ Spriteset_MapTS.prototype.initialize = function() {
     this.createActors();
     this.createEnemies();
     this.createPhase();
-    this._blueCells = [];
-    this._redCells = [];
+};
+
+Spriteset_MapTS.prototype.createLowerLayer = function() {
+    Spriteset_Map.prototype.createLowerLayer.call(this);
+    this.createTiles();
+};
+
+Spriteset_MapTS.prototype.createTiles = function() {
+    this._tilesSprite = new Sprite_Base();
+    var width = $gameMap.width();
+    var height = $gameMap.height();
+    this._tilesSprite.bitmap = new Bitmap(width * 48, height * 48);
+    this._tilesSprite.z = 1;
+    this._tilesSprite.opacity = 120;
+    this._tilesSprite.color = TacticsSystem.moveScopeColor || '#0066CC';
+    this.loadTiles();
+    this._tilemap.addChild(this._tilesSprite);
+};
+
+Spriteset_MapTS.prototype.updateTiles = function() {
+    if (this._tiles !== $gameMap.tiles()) {
+        this.loadTiles();
+    }
+    var screen = $gameScreen;
+    var scale = screen.zoomScale();
+    this._tilesSprite.x = scale;
+    this._tilesSprite.y = scale;
+    this._tilesSprite.x = Math.round($gameMap.adjustX(0) * 48);
+    this._tilesSprite.y = Math.round($gameMap.adjustY(0) * 48);
+    this._tilesSprite.x += Math.round(screen.shake());
+};
+
+Spriteset_MapTS.prototype.loadTiles = function() {
+    this._tiles = $gameMap.tiles();
+    var width = $gameMap.width();
+    var height = $gameMap.height();
+    this._tilesSprite.bitmap.clearRect(0, 0, width * 48, height * 48);
+    this._tilesSprite.color = $gameMap.color();
+    this._tiles.forEach(function(tile) {
+        var x = $gameMap.positionTileX(tile) * 48;
+        var y = $gameMap.positionTileY(tile) * 48;
+        var color = this._tilesSprite.color;
+        this._tilesSprite.bitmap.fillRect(x + 2, y + 2, 44, 44, color);
+    }, this);
 };
 
 Spriteset_MapTS.prototype.createCharacters = function() {
@@ -2439,61 +2484,13 @@ Spriteset_MapTS.prototype.battlerSprites = function() {
     return this._enemySprites.concat(this._actorSprites);
 };
 
-Spriteset_MapTS.prototype.createBlueCells = function() {
-    this._blueCells = [];
-    for (var i = 0; i < $gameMap.tiles().length; i++) {
-        var tile = $gameMap.tiles()[i];
-        var x = $gameMap.positionTileX(tile);
-        var y = $gameMap.positionTileY(tile);
-        var color = TacticsSystem.moveScopeColor || '#0066CC';
-        var cell = this.createColorCell(x, y, color);
-        this._blueCells.push(cell);
-    }
-};
-
-Spriteset_MapTS.prototype.removeBlueCells = function() {
-    for (var i = 0; i < this._blueCells.length; i++) {
-        this._blueCells[i].hide(); 
-        this._tilemap.removeChild(this._blueCells[i]);
-    }
-};
-
-Spriteset_MapTS.prototype.createRedCells = function(action) {
-    this._redCells = [];
-    var range = action.range();
-    for (var i = 0; i < range.length; i++) {
-        var x = range[i][0];
-        var y = range[i][1];
-        var color = '';
-        if (action.isForFriend()) {
-            color = TacticsSystem.allyScopeColor || '#008000';
-        } else {
-            color = TacticsSystem.enemyScopeColor || '#B22222';
-        }
-        this.createColorCell(x, y, color);
-        this._redCells.push(cell);
-    }
-};
-
-Spriteset_MapTS.prototype.removeRedCells = function() {
-    for (var i = 0; i < this._redCells.length; i++) {
-        this._redCells[i].hide();
-        this._tilemap.removeChild(this._redCells[i]);
-    }
-};
-
-Spriteset_MapTS.prototype.createColorCell = function(x, y, color) {
-    cell = new Sprite_CellTS(x, y);
-    cell.bitmap = new Bitmap(48, 48);
-    cell.bitmap.fillRect(2, 2, 44, 44, color);
-    cell.opacity = 120;
-    cell.z = 1;
-    this._tilemap.addChild(cell);
-    return cell;
-};
-
 Spriteset_MapTS.prototype.createGrid = function() {
     this._tilemap.addChild(new Sprite_GridTS());
+};
+
+Spriteset_MapTS.prototype.update = function() {
+    Spriteset_Map.prototype.update.call(this);
+    this.updateTiles();
 };
 
 Spriteset_MapTS.prototype.isBusy = function() {
@@ -2524,7 +2521,7 @@ Spriteset_MapTS.prototype.isAnyoneMoving = function() {
 };
 
 Spriteset_MapTS.prototype.isEffecting = function() {
-    return false;
+    return false;  // ?
 };
 
 Spriteset_MapTS.prototype.createPhase = function() {
@@ -2532,7 +2529,7 @@ Spriteset_MapTS.prototype.createPhase = function() {
     this.addChild(this._phaseSprite);
 };
 
-Spriteset_MapTS.prototype.startPhase = function(phase) {//phase
+Spriteset_MapTS.prototype.startPhase = function(phase) {
     //if (...)
     this._phaseSprite.setup(phase);
 };
@@ -2880,7 +2877,7 @@ Game_Action.prototype.battleFriendsUnit = function(subject) {
 
 Game_Action.prototype.searchBattlers = function(subject, units) {
     var battlers = [];
-    this.createRange(subject);
+    this.updateRange(subject);
     for (var i = 0; i < this._range.length; i++) {
         var redCell = this._range[i];
         var x = redCell[0];
@@ -2894,29 +2891,24 @@ Game_Action.prototype.searchBattlers = function(subject, units) {
     return battlers;
 };
 
-Game_Action.prototype.createRange = function(subject) {
-    var data = '';
+Game_Action.prototype.updateRange = function(subject) {
+    var data = null;
     if (this.isAttack() && subject.isActor()) {
         data = this.getWeaponRange(subject.battler());
-    } else {
+    }
+    if (!data) {
         data = this.getSkillRange();
     }
     var x = subject.x;
     var y = subject.y;
-    var range = eval('[' + data + ']');
-    this._range = range;
+    this._range = eval('[' + data + ']');
 };
 
 Game_Action.prototype.getWeaponRange = function(actor) {
-    var data = '';
+    var data = null;
     var weapon = actor.weapons()[0];
-    if (typeof weapon === 'undefined') {
-        data = this.getSkillRange();
-    } else {
+    if (weapon) {
         data = weapon.meta['range'];
-        if (typeof data === 'undefined') {
-            data = this.getSkillRange();
-        }
     }
     return data;
 };
@@ -2938,6 +2930,17 @@ Game_Action.prototype.getSkillRange = function(subject) {
 Game_Action.prototype.range = function() {
     return this._range;
 };
+
+Game_Action.prototype.showRange = function() {
+    this._range.forEach(function(pos) {
+        var tile = $gameMap.tile(pos[0], pos[1]);
+        $gameMap.addTile(tile);
+    }, this)
+};
+
+Game_Action.prototype.color = function() {
+    return this.isForFriend() ? TacticsSystem.allyScopeColor : TacticsSystem.enemyScopeColor;
+}
 
 //-----------------------------------------------------------------------------
 // Game_BattlerBase
@@ -3037,6 +3040,7 @@ var Game_Map_intializeTS = Game_Map.prototype.initialize;
 Game_Map.prototype.initialize = function() {
     Game_Map_intializeTS.call(this);
     this._tiles = [];
+    this._color = '';
 };
 
 Game_Map.prototype.addTile = function(tile) {
@@ -3069,6 +3073,18 @@ Game_Map.prototype.eraseTiles = function() {
 
 Game_Map.prototype.isOnTiles = function(x, y) {
     return this._tiles.contains(this.tile(x, y));
+};
+
+Game_Map.prototype.setMoveColor = function() {
+    this._color = TacticsSystem.moveScopeColor;
+};
+
+Game_Map.prototype.setActionColor = function(action) {
+    this._color = action.color();
+};
+
+Game_Map.prototype.color = function() {
+    return this._color;
 };
 
 //-----------------------------------------------------------------------------
