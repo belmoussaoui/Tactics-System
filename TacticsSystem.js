@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.0.2
+// TacticsSystem.js v0.4.1
 //=============================================================================
 
 /*:
@@ -343,7 +343,7 @@ Scene_BattleTS.prototype.onActorOk = function() {
     action.setTarget(this._actorWindow.actorIndex());
     this._actorWindow.hide();
     this._actorCommandWindow.close();
-    BattleManagerTS.processAction();
+    BattleManagerTS.setupAction();
 };
 
 Scene_BattleTS.prototype.onActorCancel = function() {
@@ -373,7 +373,7 @@ Scene_BattleTS.prototype.onEnemyOk = function() {
     action.setTarget(this._enemyWindow.enemyIndex());
     this._enemyWindow.hide();
     this._actorCommandWindow.close();
-    BattleManagerTS.processAction();
+    BattleManagerTS.setupAction();
 };
 
 Scene_BattleTS.prototype.onEnemyCancel = function() {
@@ -447,7 +447,7 @@ Scene_BattleTS.prototype.onSelectAction = function() {
     this._itemWindow.hide();
     if (!action.needsSelection()) {
         this._actorCommandWindow.close();
-        BattleManagerTS.processAction();
+        BattleManagerTS.setupAction();
     } else if (action.isForOpponent()) {
         this.selectEnemySelection();
     } else {
@@ -741,7 +741,7 @@ BattleManagerTS.updateMove = function() {
         if (this.subject().isActor() && !this.subject().isRestricted()) {
             this._phase = 'input';
         } else {
-            this.processAction();
+            this.setupAction();
         }
     }
 };
@@ -808,13 +808,20 @@ BattleManagerTS.endEnemyPhase = function() {
     this.startTurn();
 };
 
+BattleManagerTS.setupAction = function() {
+    var action = this.subject().currentAction();
+    if (action && action.isValid()) {
+        this.setupLocalBattle(action);
+    }
+    this.processAction();
+};
+
 BattleManagerTS.processAction = function() {
     var subject = this.subject();
     var action = subject.currentAction();
     if (action) {
         action.prepare();
         if (action.isValid()) {
-            this.setupLocalBattle(action);
             this.startAction();
         }
         subject.removeCurrentAction();
@@ -1962,6 +1969,28 @@ Window_ActorCommandTS.prototype.addActionCommand = function() {
 //
 // The window for displaying the unit status on the battle screen.
 
+function Window_InformationTS() {
+    this.initialize.apply(this, arguments);
+}
+
+Window_InformationTS.prototype = Object.create(Window_Base.prototype);
+Window_InformationTS.prototype.constructor = Window_BattleStatusTS;
+
+Window_InformationTS.prototype.initialize = function() {
+    var width = 120;
+    var height = 120;
+    var x = 0;
+    var y = 0;
+    Window_Base.prototype.initialize.call(this, x, y, width, height);
+    this.openness = 0;
+};
+
+
+//-----------------------------------------------------------------------------
+// Window_BattleStatusTS
+//
+// The window for displaying the unit status on the battle screen.
+
 function Window_BattleStatusTS() {
     this.initialize.apply(this, arguments);
 }
@@ -1973,7 +2002,7 @@ Window_BattleStatusTS.prototype.initialize = function() {
     var width = this.windowWidth();
     var height = this.windowHeight();
     var x = Graphics.boxWidth - (this.windowWidth());
-    var y = 0;
+    var y = Graphics.boxHeight - (this.windowHeight());
     Window_Base.prototype.initialize.call(this, x, y, width, height);
     this.openness = 0;
 };
@@ -1983,7 +2012,7 @@ Window_BattleStatusTS.prototype.setup = function(actor) {
 };
 
 Window_BattleStatusTS.prototype.windowWidth = function() {
-    return 240;
+    return 400;
 };
 
 Window_BattleStatusTS.prototype.windowHeight = function() {
@@ -1991,7 +2020,7 @@ Window_BattleStatusTS.prototype.windowHeight = function() {
 };
 
 Window_BattleStatusTS.prototype.numVisibleRows = function() {
-    return 2;
+    return 4;
 };
 
 Window_BattleStatusTS.prototype.open = function(actor) {
@@ -2001,30 +2030,7 @@ Window_BattleStatusTS.prototype.open = function(actor) {
 
 Window_BattleStatusTS.prototype.refresh = function(actor) {
     this.contents.clear();
-    this.drawItem(actor.battler());
-};
-
-Window_BattleStatusTS.prototype.drawItem = function(actor) {
-    this.drawGaugeArea(actor);
-};
-
-Window_BattleStatusTS.prototype.drawGaugeArea = function(actor) {
-    if ($dataSystem.optDisplayTp) {
-        this.drawGaugeAreaWithTp(actor);
-    } else {
-        this.drawGaugeAreaWithoutTp(actor);
-    }
-};
-
-Window_BattleStatusTS.prototype.drawGaugeAreaWithTp = function(actor) {
-    this.drawActorHp(actor,   0,  0, 200);
-    this.drawActorMp(actor,   0, 35, 110);
-    this.drawActorTp(actor, 120, 35,  80);
-};
-
-Window_BattleStatusTS.prototype.drawGaugeAreaWithoutTp = function(actor) {
-    this.drawActorHp(actor,  0,  0, 200);
-    this.drawActorMp(actor, 30, 35, 170);
+    //this.drawActorSimpleStatus(actor.battler(), 0, 0, 400);
 };
 
 //-----------------------------------------------------------------------------
@@ -2197,6 +2203,16 @@ Window_BattleEnemyTS.prototype.refresh = function() {
 Window_BattleEnemyTS.prototype.select = function(index) {
     Window_BattleTargetTS.prototype.select.call(this, index);
     $gameTroop.select(this.target());
+};
+
+Window_BattleEnemyTS.prototype.processCursorMove = function () {
+    var lastIndex = this.index();
+    Window_BattleTargetTS.prototype.processCursorMove.call(this);
+    if (this.index() !== lastIndex) {
+        var action = BattleManagerTS.inputtingAction();
+        action.setTarget(this.enemyIndex())
+        console.log(action.makeDamageValue(this.target().battler(), false));
+    }
 };
 
 //-----------------------------------------------------------------------------
@@ -3205,7 +3221,7 @@ Game_Interpreter.prototype.updateWaitMode = function() {
 
 var Window_BattleLog_showNormalAnimationTS = Window_BattleLog.prototype.showNormalAnimation;
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
-    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
+    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) { // to do
         var animation = $dataAnimations[animationId];
         if (animation) {
             targets.forEach(function(target) {
