@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.0.2
+// TacticsSystem.js v0.4.0.3
 //=============================================================================
 
 /*:
@@ -343,7 +343,7 @@ Scene_BattleTS.prototype.onActorOk = function() {
     action.setTarget(this._actorWindow.actorIndex());
     this._actorWindow.hide();
     this._actorCommandWindow.close();
-    BattleManagerTS.processAction();
+    BattleManagerTS.setupAction();
 };
 
 Scene_BattleTS.prototype.onActorCancel = function() {
@@ -373,7 +373,7 @@ Scene_BattleTS.prototype.onEnemyOk = function() {
     action.setTarget(this._enemyWindow.enemyIndex());
     this._enemyWindow.hide();
     this._actorCommandWindow.close();
-    BattleManagerTS.processAction();
+    BattleManagerTS.setupAction();
 };
 
 Scene_BattleTS.prototype.onEnemyCancel = function() {
@@ -447,7 +447,7 @@ Scene_BattleTS.prototype.onSelectAction = function() {
     this._itemWindow.hide();
     if (!action.needsSelection()) {
         this._actorCommandWindow.close();
-        BattleManagerTS.processAction();
+        BattleManagerTS.setupAction();
     } else if (action.isForOpponent()) {
         this.selectEnemySelection();
     } else {
@@ -741,7 +741,7 @@ BattleManagerTS.updateMove = function() {
         if (this.subject().isActor() && !this.subject().isRestricted()) {
             this._phase = 'input';
         } else {
-            this.processAction();
+            this.setupAction();
         }
     }
 };
@@ -808,13 +808,20 @@ BattleManagerTS.endEnemyPhase = function() {
     this.startTurn();
 };
 
+BattleManagerTS.setupAction = function() {
+    var action = this.subject().currentAction();
+    if (action && action.isValid()) {
+        this.setupLocalBattle(action);
+    }
+    this.processAction();
+};
+
 BattleManagerTS.processAction = function() {
     var subject = this.subject();
     var action = subject.currentAction();
     if (action) {
         action.prepare();
         if (action.isValid()) {
-            this.setupLocalBattle(action);
             this.startAction();
         }
         subject.removeCurrentAction();
