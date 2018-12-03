@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.0.3
+// TacticsSystem.js v0.4.0.4
 //=============================================================================
 
 /*:
@@ -273,7 +273,7 @@ Scene_Battle.prototype.updateStatusWindow = function() {
     var select = $gameSelectorTS.select();
     if (this.canShowStatusWindow(select)) {
         this._statusWindow.open(select);
-    } else {
+    } else if (BattleManagerTS.isInputting() || BattleManagerTS.isExploration()) {
         this._statusWindow.close();
     }
 };
@@ -750,8 +750,12 @@ BattleManagerTS.isInputting = function() {
     return this._phase === 'input';
 };
 
-BattleManagerTS.isExporation = function() {
+BattleManagerTS.isExploration = function() {
     return this._phase === 'playerExplore';
+};
+
+BattleManagerTS.isSelect = function() {
+    return this._phase === 'playerSelect';
 };
 
 BattleManagerTS.isStartPhase = function() {
@@ -834,12 +838,6 @@ BattleManagerTS.processAction = function() {
     }
 };
 
-BattleManagerTS.refreshState = function(battler) {
-    var friendsUnitTS = battler.friendsUnitTS();  // use sprite !
-    battler = friendsUnitTS.getBattlerTS(battler);
-    battler.refreshState();
-};
-
 BattleManagerTS.startAction = function() {
     var subject = this.subject();
     var action = subject.currentAction();
@@ -876,7 +874,8 @@ BattleManagerTS.invokeAction = function(subject, target) {
     }
     subject.setLastTarget(target);
     this._logWindow.push('popBaseLine');
-    this.refreshState(target);
+    $gamePartyTS.refreshState();
+    $gameTroopTS.refreshState();
 };
 
 BattleManagerTS.invokeNormalAction = function(subject, target) {
@@ -1477,7 +1476,7 @@ Game_BattlerTS.prototype.onTurnStart = function() {
 };
 
 Game_BattlerTS.prototype.endAction = function() {
-    this.defaultDirection();  // use state
+    this.defaultDirection();
     this._hasPlayed = true;
 };
 
@@ -1497,7 +1496,7 @@ Game_BattlerTS.prototype.moveStraightTo = function(x, y) {
 };
 
 Game_BattlerTS.prototype.refreshState = function() {
-    if (!this.isAlive()) {
+    if (!this.isAlive() && !this._event.isErased()) {
         var animationIdOfDeath = TacticsSystem.animationIdOfDeath || -1;
         this._event.requestAnimation(animationIdOfDeath);
         this._event.erase();
@@ -1842,6 +1841,12 @@ Game_UnitTS.prototype.getBattlerTS = function(object) {
     return null;
 };
 
+Game_UnitTS.prototype.refreshState = function() {
+    this.members().forEach(function(member) {
+        member.refreshState();
+    });
+};
+
 //-----------------------------------------------------------------------------
 // Game_PartyTS
 //
@@ -1964,6 +1969,7 @@ Window_ActorCommandTS.prototype.addActionCommand = function() {
     }
 };
 
+
 //-----------------------------------------------------------------------------
 // Window_BattleStatusTS
 //
@@ -1980,7 +1986,7 @@ Window_BattleStatusTS.prototype.initialize = function() {
     var width = this.windowWidth();
     var height = this.windowHeight();
     var x = Graphics.boxWidth - (this.windowWidth());
-    var y = 0;
+    var y = Graphics.boxHeight - (this.windowHeight());
     Window_Base.prototype.initialize.call(this, x, y, width, height);
     this.openness = 0;
 };
@@ -1990,7 +1996,7 @@ Window_BattleStatusTS.prototype.setup = function(actor) {
 };
 
 Window_BattleStatusTS.prototype.windowWidth = function() {
-    return 240;
+    return 420;
 };
 
 Window_BattleStatusTS.prototype.windowHeight = function() {
@@ -1998,40 +2004,48 @@ Window_BattleStatusTS.prototype.windowHeight = function() {
 };
 
 Window_BattleStatusTS.prototype.numVisibleRows = function() {
-    return 2;
+    return 4;
 };
 
-Window_BattleStatusTS.prototype.open = function(actor) {
-    this.refresh(actor)
+Window_BattleStatusTS.prototype.open = function(battlerTS) {
+    this.refresh(battlerTS)
     Window_Base.prototype.open.call(this);
 };
 
-Window_BattleStatusTS.prototype.refresh = function(actor) {
+Window_BattleStatusTS.prototype.refresh = function(battlerTS) {
+    var battler = battlerTS.battler();
+    var event = battlerTS.event();
     this.contents.clear();
-    this.drawItem(actor.battler());
-};
-
-Window_BattleStatusTS.prototype.drawItem = function(actor) {
-    this.drawGaugeArea(actor);
-};
-
-Window_BattleStatusTS.prototype.drawGaugeArea = function(actor) {
-    if ($dataSystem.optDisplayTp) {
-        this.drawGaugeAreaWithTp(actor);
-    } else {
-        this.drawGaugeAreaWithoutTp(actor);
+    if (battler.isActor()) {
+        this.drawActorFace(battler, 0, 0, Window_Base._faceWidth, Window_Base._faceHeight);
+        this.drawActorSimpleStatus(battler, 0, 0, 420);
+    } else {
+        this.drawEnemyImage(battler, 0, 0);
+        this.drawEnemySimpleStatus(battler, 0, 0, 420);
     }
 };
 
-Window_BattleStatusTS.prototype.drawGaugeAreaWithTp = function(actor) {
-    this.drawActorHp(actor,   0,  0, 200);
-    this.drawActorMp(actor,   0, 35, 110);
-    this.drawActorTp(actor, 120, 35,  80);
+Window_Base.prototype.drawEnemySimpleStatus = function(enemy, x, y, width) {
+    var lineHeight = this.lineHeight();
+    var x2 = x + 180;
+    var width2 = Math.min(200, width - 180 - this.textPadding());
+    this.drawActorName(enemy, x2, y);
+    this.drawActorHp(enemy, x2, y + lineHeight * 1, width2);
+    this.drawActorMp(enemy, x2, y + lineHeight * 2, width2);
 };
 
-Window_BattleStatusTS.prototype.drawGaugeAreaWithoutTp = function(actor) {
-    this.drawActorHp(actor,  0,  0, 200);
-    this.drawActorMp(actor, 30, 35, 170);
+Window_Base.prototype.drawEnemyImage = function(battler, x, y, width, height) {
+    width = width || Window_Base._faceWidth;
+    height = height || Window_Base._faceHeight;
+    var bitmap = ImageManager.loadEnemy(battler.battlerName());
+    var pw = bitmap.width;
+    var ph = bitmap.height;
+    var sw = Math.min(width, pw);
+    var sh = Math.min(height, ph);
+    var dx = Math.floor(x + Math.max(width - pw, 0) / 2);
+    var dy = Math.floor(y + Math.max(height - ph, 0) / 2);
+    var q = 150 / Math.max(bitmap.width, bitmap.height)
+    this.contents.blt(bitmap, 0, 0, pw, ph, 0, 0, bitmap.width * q, bitmap.height * q);
 };
 
 //-----------------------------------------------------------------------------
@@ -2204,6 +2218,16 @@ Window_BattleEnemyTS.prototype.refresh = function() {
 Window_BattleEnemyTS.prototype.select = function(index) {
     Window_BattleTargetTS.prototype.select.call(this, index);
     $gameTroop.select(this.target());
+};
+
+Window_BattleEnemyTS.prototype.processCursorMove = function () {
+    var lastIndex = this.index();
+    Window_BattleTargetTS.prototype.processCursorMove.call(this);
+    if (this.index() !== lastIndex) {
+        var action = BattleManagerTS.inputtingAction();
+        action.setTarget(this.enemyIndex())
+        console.log(action.makeDamageValue(this.target().battler(), false));
+    }
 };
 
 //-----------------------------------------------------------------------------
@@ -2822,7 +2846,7 @@ DataManager.createGameObjects = function() {
     $gameSelectorTS =     new Game_SelectorTS();
     $gameTroopTS =        new Game_TroopTS();
     $gamePartyTS =        new Game_PartyTS();
-    DataManager_createGameObjectsTS.call();
+    DataManager_createGameObjectsTS.call(this);
 };
 
 //-----------------------------------------------------------------------------
@@ -3137,6 +3161,10 @@ Game_Event.prototype.name = function() {
     return this._name;
 };
 
+Game_Event.prototype.isErased = function() {
+    return this._erased;
+};
+
 Game_Event.prototype.setMeta = function(meta) {
     this._meta = meta;
 };
@@ -3212,7 +3240,7 @@ Game_Interpreter.prototype.updateWaitMode = function() {
 
 var Window_BattleLog_showNormalAnimationTS = Window_BattleLog.prototype.showNormalAnimation;
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
-    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
+    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) { // to do
         var animation = $dataAnimations[animationId];
         if (animation) {
             targets.forEach(function(target) {
