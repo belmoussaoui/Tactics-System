@@ -124,6 +124,7 @@ Scene_BattleTS.prototype.createSelector = function() {
 Scene_BattleTS.prototype.createAllWindows = function() {
     this.createLogWindow();
     this.createStatusWindow();
+    this.createInformationWindow();
     this.createActorCommandWindow();
     this.createHelpWindow();
     this.createSkillWindow();
@@ -142,6 +143,11 @@ Scene_BattleTS.prototype.createLogWindow = function() {
 Scene_BattleTS.prototype.createStatusWindow = function() {
     this._statusWindow = new Window_BattleStatusTS();
     this.addWindow(this._statusWindow);
+};
+
+Scene_BattleTS.prototype.createInformationWindow = function() {
+    this._informationWindow = new Window_InformationTS();
+    this.addWindow(this._informationWindow);
 };
 
 Scene_BattleTS.prototype.createActorCommandWindow = function() {
@@ -229,6 +235,7 @@ Scene_BattleTS.prototype.update = function() {
     if (active && !this.isBusy()) {
         this.updateBattleProcess();
         this.updateStatusWindow();
+        this.updateInformationWindow();
     }
     $gameTimer.update(active);
     $gameScreen.update();
@@ -280,6 +287,19 @@ Scene_BattleTS.prototype.updateStatusWindow = function() {
 
 Scene_BattleTS.prototype.canShowStatusWindow = function(select) {
     return select && select.isAlive() && BattleManagerTS.isExploration();
+};
+
+Scene_BattleTS.prototype.updateInformationWindow = function() {
+    if (this._enemyWindow.active) {
+        var select = $gameSelectorTS.select();
+        this._informationWindow.open(select);
+    } else {
+        this._informationWindow.close();
+    }
+   //     var index = this._enemyWindow.enemyIndex();
+   // if (index !== this._index) {
+   //     this._startStatus.setActor($gameParty.members()[index]);
+   // }
 };
 
 Scene_BattleTS.prototype.isAnyInputWindowActive = function() {
@@ -1969,7 +1989,6 @@ Window_ActorCommandTS.prototype.addActionCommand = function() {
     }
 };
 
-
 //-----------------------------------------------------------------------------
 // Window_BattleStatusTS
 //
@@ -1989,10 +2008,6 @@ Window_BattleStatusTS.prototype.initialize = function() {
     var y = Graphics.boxHeight - (this.windowHeight());
     Window_Base.prototype.initialize.call(this, x, y, width, height);
     this.openness = 0;
-};
-
-Window_BattleStatusTS.prototype.setup = function(actor) {
-    this.refresh();
 };
 
 Window_BattleStatusTS.prototype.windowWidth = function() {
@@ -2025,7 +2040,7 @@ Window_BattleStatusTS.prototype.refresh = function(battlerTS) {
     }
 };
 
-Window_Base.prototype.drawEnemySimpleStatus = function(enemy, x, y, width) {
+Window_BattleStatusTS.prototype.drawEnemySimpleStatus = function(enemy, x, y, width) {
     var lineHeight = this.lineHeight();
     var x2 = x + 180;
     var width2 = Math.min(200, width - 180 - this.textPadding());
@@ -2034,7 +2049,81 @@ Window_Base.prototype.drawEnemySimpleStatus = function(enemy, x, y, width) {
     this.drawActorMp(enemy, x2, y + lineHeight * 2, width2);
 };
 
-Window_Base.prototype.drawEnemyImage = function(battler, x, y, width, height) {
+Window_BattleStatusTS.prototype.drawEnemyImage = function(battler, x, y, width, height) {
+    width = width || Window_Base._faceWidth;
+    height = height || Window_Base._faceHeight;
+    var bitmap = ImageManager.loadEnemy(battler.battlerName());
+    var pw = bitmap.width;
+    var ph = bitmap.height;
+    var sw = Math.min(width, pw);
+    var sh = Math.min(height, ph);
+    var dx = Math.floor(x + Math.max(width - pw, 0) / 2);
+    var dy = Math.floor(y + Math.max(height - ph, 0) / 2);
+    var q = 150 / Math.max(bitmap.width, bitmap.height)
+    this.contents.blt(bitmap, 0, 0, pw, ph, 0, 0, bitmap.width * q, bitmap.height * q);
+};
+
+//-----------------------------------------------------------------------------
+// Window_InformationTS
+//
+// The window for displaying the combat information on the battle screen.
+
+function Window_InformationTS() {
+    this.initialize.apply(this, arguments);
+}
+
+Window_InformationTS.prototype = Object.create(Window_Base.prototype);
+Window_InformationTS.prototype.constructor = Window_InformationTS;
+
+Window_InformationTS.prototype.initialize = function() {
+    var width = this.windowWidth();
+    var height = this.windowHeight();
+    var x = Graphics.boxWidth - (this.windowWidth());
+    var y = 0
+    Window_Base.prototype.initialize.call(this, x, y, width, height);
+    this.openness = 0;
+};
+
+Window_InformationTS.prototype.windowWidth = function() {
+    return 420;
+};
+
+Window_InformationTS.prototype.windowHeight = function() {
+    return this.fittingHeight(this.numVisibleRows());
+};
+
+Window_InformationTS.prototype.numVisibleRows = function() {
+    return 4;
+};
+
+Window_InformationTS.prototype.open = function(battlerTS) {
+    this.refresh(battlerTS)
+    Window_Base.prototype.open.call(this);
+};
+
+Window_InformationTS.prototype.refresh = function(battlerTS) {
+    var battler = battlerTS.battler();
+    var event = battlerTS.event();
+    this.contents.clear();
+    if (battler.isActor()) {
+        this.drawActorFace(battler, 0, 0, Window_Base._faceWidth, Window_Base._faceHeight);
+        this.drawActorSimpleStatus(battler, 0, 0, 420);
+    } else {
+        this.drawEnemyImage(battler, 0, 0);
+        this.drawEnemySimpleStatus(battler, 0, 0, 420);
+    }
+};
+
+Window_InformationTS.prototype.drawEnemySimpleStatus = function(enemy, x, y, width) {
+    var lineHeight = this.lineHeight();
+    var x2 = x + 180;
+    var width2 = Math.min(200, width - 180 - this.textPadding());
+    this.drawActorName(enemy, x2, y);
+    this.drawActorHp(enemy, x2, y + lineHeight * 1, width2);
+    this.drawActorMp(enemy, x2, y + lineHeight * 2, width2);
+};
+
+Window_InformationTS.prototype.drawEnemyImage = function(battler, x, y, width, height) {
     width = width || Window_Base._faceWidth;
     height = height || Window_Base._faceHeight;
     var bitmap = ImageManager.loadEnemy(battler.battlerName());
@@ -2223,11 +2312,11 @@ Window_BattleEnemyTS.prototype.select = function(index) {
 Window_BattleEnemyTS.prototype.processCursorMove = function () {
     var lastIndex = this.index();
     Window_BattleTargetTS.prototype.processCursorMove.call(this);
-    if (this.index() !== lastIndex) {
-        var action = BattleManagerTS.inputtingAction();
-        action.setTarget(this.enemyIndex())
-        console.log(action.makeDamageValue(this.target().battler(), false));
-    }
+    //if (this.index() !== lastIndex) {
+        //var action = BattleManagerTS.inputtingAction();
+        //action.setTarget(this.enemyIndex())
+        //console.log(action.makeDamageValue(this.target().battler(), false));
+    //}
 };
 
 //-----------------------------------------------------------------------------
