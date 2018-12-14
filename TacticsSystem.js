@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.0.4
+// TacticsSystem.js v0.4.1
 //=============================================================================
 
 /*:
@@ -20,7 +20,7 @@
  *
  * @param action range
  * @desc The range of skill or object.
- * @default [x+1,y],[x-1,y],[x,y+1],[x,y-1]
+ * @default diamond 1
  *
  * @param move scope color
  * @desc The color to display the move range.
@@ -2814,17 +2814,17 @@ Sprite_PhaseTS.prototype.drawPhase = function(phase) {
 //
 // The scene class of the map screen.
 
-var Scene_Map_stopTS = Scene_Map.prototype.stop;
+TacticsSystem.Scene_Map_stop = Scene_Map.prototype.stop;
 Scene_Map.prototype.stop = function() {
-    Scene_Map_stopTS.call(this);
+    TacticsSystem.Scene_Map_stop.call(this);
     if (SceneManager.isNextScene(Scene_BattleTS)) {
         this.launchBattle();
     }
 };
 
-var Scene_Map_updateTS = Scene_Map.prototype.update;
+TacticsSystem.Scene_Map_update = Scene_Map.prototype.update;
 Scene_Map.prototype.update = function() {
-    Scene_Map_updateTS.call(this);
+    TacticsSystem.Scene_Map_update.call(this);
     if (SceneManager.isNextScene(Scene_BattleTS)) {
         this.updateEncounterEffect();
     }
@@ -2835,12 +2835,17 @@ Scene_Map.prototype.update = function() {
 //
 // The static class that manages the database and game objects.
 
-var DataManager_createGameObjectsTS = DataManager.createGameObjects;
+TacticsSystem.DataManager_createGameObjects = DataManager.createGameObjects;
 DataManager.createGameObjects = function() {
     $gameSelectorTS =     new Game_SelectorTS();
     $gameTroopTS =        new Game_TroopTS();
     $gamePartyTS =        new Game_PartyTS();
-    DataManager_createGameObjectsTS.call(this);
+    TacticsSystem.DataManager_createGameObjects.call(this);
+};
+
+DataManager.extractRangeData = function (object) {
+    var data = object.meta['range'] || TacticsSystem.actionRange;
+    return data.split(' ');
 };
 
 //-----------------------------------------------------------------------------
@@ -2848,9 +2853,9 @@ DataManager.createGameObjects = function() {
 //
 // The game object class for temporary data that is not included in save data.
 
-var Game_Temp_initializeTS = Game_Temp.prototype.initialize;
+TacticsSystem.Game_Temp_initialize = Game_Temp.prototype.initialize;
 Game_Temp.prototype.initialize = function() {
-    Game_Temp_initializeTS.call(this);
+    TacticsSystem.Game_Temp_initialize.call(this);
     this._positionX = null;
     this._positionY = null;
 };
@@ -2917,39 +2922,24 @@ Game_Action.prototype.searchBattlers = function(subject, units) {
 };
 
 Game_Action.prototype.updateRange = function(subject) {
-    var data = null;
-    if (this.isAttack() && subject.isActor()) {
-        data = this.getWeaponRange(subject.battler());
-    }
-    if (!data) {
-        data = this.getSkillRange();
-    }
-    var x = subject.x;
-    var y = subject.y;
-    this._range = eval('[' + data + ']');
+    var data = DataManager.extractRangeData(this.item());
+    this._range = this.createRange(data[0], parseInt(data[1]), subject.x, subject.y);
 };
 
-Game_Action.prototype.getWeaponRange = function(actor) {
-    var data = null;
-    var weapon = actor.weapons()[0];
-    if (weapon) {
-        data = weapon.meta['range'];
+Game_Action.prototype.createRange = function(tag, d, x, y) {
+    var range = [];
+    for (var i = x - d; i <= x + d; i++) {
+        for (var j = y - d; j <= y + d; j++) {
+            if (tag === 'diamond' && Math.abs(i - x) + Math.abs(j - y) <= d) {
+                range.push([i, j]);
+            } else if (tag === 'line' && i === x || j === y) {
+                range.push([i, j]);
+            } else if (tag === 'rectangle') {
+                range.push([i, j]);
+            }
+        }
     }
-    return data;
-};
-
-Game_Action.prototype.getSkillRange = function(subject) {
-    var data = this.item().meta['range'];
-    if (typeof data === 'undefined') {
-        data = TacticsSystem.actionRange;
-    }
-    if (this.isForFriend()) {
-        data = '[x, y],' + data;
-    }
-    if (this.isForUser()) {
-        data = '[x, y]';
-    }
-    return data;
+    return range;
 };
 
 Game_Action.prototype.range = function() {
@@ -2972,6 +2962,16 @@ Game_Action.prototype.color = function() {
 //
 // The superclass of Game_Battler. It mainly contains parameters calculation.
 
+TacticsSystem.Game_BattlerBase_canUse = Game_BattlerBase.prototype.canUse;
+Game_BattlerBase.prototype.canUse = function(item) {
+    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
+        if (!this.isItemRangeValid(item)) {
+            return false;
+        }
+    }
+    return TacticsSystem.Game_BattlerBase_canUse.call(this, item);
+};
+
 Game_BattlerBase.prototype.isItemRangeValid = function(item) {
     var friendsUnitTS = this.friendsUnitTS();
     var battler = friendsUnitTS.getBattlerTS(this);
@@ -2984,16 +2984,6 @@ Game_BattlerBase.prototype.isOccasionOk = function(item) {
     } else {
         return item.occasion === 0 || item.occasion === 2;
     }
-};
-
-var Game_BattlerBase_canUseTS = Game_BattlerBase.prototype.canUse;
-Game_BattlerBase.prototype.canUse = function(item) {
-    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
-        if (!this.isItemRangeValid(item)) {
-            return false;
-        }
-    }
-    return Game_BattlerBase_canUseTS.call(this, item);
 };
 
 //-----------------------------------------------------------------------------
@@ -3061,9 +3051,9 @@ Game_Troop.prototype.increaseTurn = function() {
 // The game object class for a map. It contains scrolling and passage
 // determination functions.
 
-var Game_Map_intializeTS = Game_Map.prototype.initialize;
+TacticsSystem.Game_Map_intialize = Game_Map.prototype.initialize;
 Game_Map.prototype.initialize = function() {
-    Game_Map_intializeTS.call(this);
+    TacticsSystem.Game_Map_intialize.call(this);
     this._tiles = [];
     this._color = '';
 };
@@ -3127,14 +3117,14 @@ Game_Character.prototype.searchLimit = function() {
 // The game object class for an event. It contains functionality for event page
 // switching and running parallel process events.
 
-var Game_Event_initializeTS = Game_Event.prototype.initialize;
+TacticsSystem.Game_Event_initialize = Game_Event.prototype.initialize;
 Game_Event.prototype.initialize = function(mapId, eventId) {
-    Game_Event_initializeTS.call(this, mapId, eventId);
+    TacticsSystem.Game_Event_initialize.call(this, mapId, eventId);
     this.setName(this.event().name);
     this.setMeta(this.event().meta);
 };
 
-var Game_Event_isCollidedWithEventsTS = Game_Event.prototype.isCollidedWithEvents;
+TacticsSystem.Game_Event_isCollidedWithEvents = Game_Event.prototype.isCollidedWithEvents;
 Game_Event.prototype.isCollidedWithEvents = function(x, y) {
     // for an actor to pass through an actor
     if (this.isActorTS()) {
@@ -3143,7 +3133,7 @@ Game_Event.prototype.isCollidedWithEvents = function(x, y) {
             return event.isNormalPriority() && !event.isActorTS();
         });
     } else {
-        return Game_Event_isCollidedWithEventsTS.call(this, x, y);
+        return TacticsSystem.Game_Event_isCollidedWithEvents.call(this, x, y);
     }
 };
 
@@ -3213,7 +3203,7 @@ Game_Event.prototype.tilesRange = function(distance) {
 //
 // The interpreter for running event commands.
 
-var Game_Interpreter_updateWaitModeTS = Game_Interpreter.prototype.updateWaitMode;
+TacticsSystem.Game_Interpreter_updateWaitMode = Game_Interpreter.prototype.updateWaitMode;
 Game_Interpreter.prototype.updateWaitMode = function() {
     if (this._waitMode === 'battleTS') {
         var waiting = !BattleManagerTS.isBattleEnd();
@@ -3222,7 +3212,7 @@ Game_Interpreter.prototype.updateWaitMode = function() {
         }
         return waiting;
     } else {
-        return Game_Interpreter_updateWaitModeTS.call(this);
+        return TacticsSystem.Game_Interpreter_updateWaitMode.call(this);
     }
 };
 
@@ -3232,7 +3222,7 @@ Game_Interpreter.prototype.updateWaitMode = function() {
 // The window for displaying battle progress. No frame is displayed, but it is
 // handled as a window for convenience.
 
-var Window_BattleLog_showNormalAnimationTS = Window_BattleLog.prototype.showNormalAnimation;
+TacticsSystem.Window_BattleLog_showNormalAnimation = Window_BattleLog.prototype.showNormalAnimation;
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
     if ($gameParty.inBattleTS() && !$gameParty.inBattle()) { // to do
         var animation = $dataAnimations[animationId];
@@ -3244,7 +3234,7 @@ Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, 
             });
         }
     } else {
-        Window_BattleLog_showNormalAnimationTS.call(this, targets, animationId, mirror);
+        TacticsSystem.Window_BattleLog_showNormalAnimation.call(this, targets, animationId, mirror);
     }
 };
 

@@ -1,5 +1,5 @@
 //=============================================================================
-// CombatScene.js v0.1
+// CombatScene.js v0.1.1
 //=============================================================================
 
 /*:
@@ -196,7 +196,7 @@ BattleManagerTS.isStartCombat = function() {
 // handled as a window for convenience.
 
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
-    Window_BattleLog_showNormalAnimationTS.call(this, targets, animationId, mirror);
+    TacticsSystem.Window_BattleLog_showNormalAnimation.call(this, targets, animationId, mirror);
 };
 
 //-----------------------------------------------------------------------------
