@@ -2206,7 +2206,6 @@ Window_BattleEnemyTS.prototype.hide = function() {
 
 Window_BattleEnemyTS.prototype.refresh = function() {
     this._enemies = $gameTroopTS.battleMembers();
-    console.log(this._enemies);
     Window_BattleTargetTS.prototype.refresh.call(this);
 };
 
@@ -2844,8 +2843,14 @@ DataManager.createGameObjects = function() {
 };
 
 DataManager.extractRangeData = function (object) {
+    var re = /(\[.*?\])/g;
     var data = object.meta['range'] || TacticsSystem.actionRange;
-    return data.split(' ');
+    var match = re.exec(data)
+    if (match) {
+        return ['custom', data];
+    } else {
+        return data.split(' ');
+    }
 };
 
 //-----------------------------------------------------------------------------
@@ -2907,7 +2912,11 @@ Game_Action.prototype.battleFriendsUnit = function(subject) {
 
 Game_Action.prototype.searchBattlers = function(subject, units) {
     var battlers = [];
-    this.updateRange(subject);
+    var item = this.item()
+    if (this.isAttackRange(subject)) {
+        item = subject.battler().weapons()[0] || subject.battler().weapons()[1];
+    }
+    this.updateRange(item, subject.x, subject.y);
     for (var i = 0; i < this._range.length; i++) {
         var redCell = this._range[i];
         var x = redCell[0];
@@ -2921,9 +2930,18 @@ Game_Action.prototype.searchBattlers = function(subject, units) {
     return battlers;
 };
 
-Game_Action.prototype.updateRange = function(subject) {
-    var data = DataManager.extractRangeData(this.item());
-    this._range = this.createRange(data[0], parseInt(data[1]), subject.x, subject.y);
+Game_Action.prototype.isAttackRange = function (subject) {
+    return this.isAttack() && subject.isActor() && !subject.battler().hasNoWeapons();
+}
+
+Game_Action.prototype.updateRange = function(item, x, y) {
+    var data = DataManager.extractRangeData(item);
+    var range = null;
+    if (data[0] === 'custom') {
+        this._range = eval(data[1]);
+    } else {
+        this._range = this.createRange(data[0], parseInt(data[1]), x, y);
+    }
 };
 
 Game_Action.prototype.createRange = function(tag, d, x, y) {
