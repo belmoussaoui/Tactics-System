@@ -304,6 +304,7 @@ Scene_BattleTS.prototype.commandAttack = function() {
 };
 
 Scene_BattleTS.prototype.commandSkill = function() {
+    this._statusWindow.hide();
     this._skillWindow.setActor(BattleManagerTS.subject());
     this._skillWindow.setStypeId(this._actorCommandWindow.currentExt());
     this._skillWindow.refresh();
@@ -318,6 +319,7 @@ Scene_BattleTS.prototype.commandGuard = function() {
 };
 
 Scene_BattleTS.prototype.commandItem = function() {
+    this._statusWindow.hide();
     this._itemWindow.refresh();
     this._itemWindow.show();
     this._itemWindow.activate();
@@ -333,6 +335,7 @@ Scene_BattleTS.prototype.selectPreviousCommand = function() {
 };
 
 Scene_BattleTS.prototype.selectActorSelection = function() {
+    this._statusWindow.show();
     this._actorWindow.refresh();
     this._actorWindow.show();
     this._actorWindow.activate();
@@ -341,13 +344,14 @@ Scene_BattleTS.prototype.selectActorSelection = function() {
 Scene_BattleTS.prototype.onActorOk = function() {
     var action = BattleManagerTS.inputtingAction();
     action.setTarget(this._actorWindow.actorIndex());
-    this._actorWindow.hide();
+    this._actorWindow.show();
     this._actorCommandWindow.close();
     BattleManagerTS.setupAction();
 };
 
 Scene_BattleTS.prototype.onActorCancel = function() {
     this._actorWindow.hide();
+    this._statusWindow.hide();
     BattleManagerTS.processCancel();
     switch (this._actorCommandWindow.currentSymbol()) {
     case 'skill':
@@ -362,6 +366,7 @@ Scene_BattleTS.prototype.onActorCancel = function() {
 };
 
 Scene_BattleTS.prototype.selectEnemySelection = function() {
+    this._statusWindow.show();
     this._enemyWindow.refresh();
     this._enemyWindow.show();
     this._enemyWindow.select(0);
@@ -384,10 +389,12 @@ Scene_BattleTS.prototype.onEnemyCancel = function() {
         this._actorCommandWindow.activate();
         break;
     case 'skill':
+        this._statusWindow.hide();
         this._skillWindow.show();
         this._skillWindow.activate();
         break;
     case 'item':
+        this._statusWindow.hide();
         this._itemWindow.show();
         this._itemWindow.activate();
         break;
@@ -423,6 +430,7 @@ Scene_BattleTS.prototype.onSkillOk = function() {
 
 Scene_BattleTS.prototype.onSkillCancel = function() {
     BattleManagerTS.processCancel();
+    this._statusWindow.show();
     this._skillWindow.hide();
     this._actorCommandWindow.activate();
 };
@@ -437,6 +445,7 @@ Scene_BattleTS.prototype.onItemOk = function() {
 
 Scene_BattleTS.prototype.onItemCancel = function() {
     BattleManagerTS.processCancel();
+    this._statusWindow.show();
     this._itemWindow.hide();
     this._actorCommandWindow.activate();
 };
@@ -2849,7 +2858,7 @@ DataManager.extractRangeData = function (object) {
     if (match) {
         return ['custom', data];
     } else {
-        return data.split(' ');
+        return data.trim().split(' ');
     }
 };
 
