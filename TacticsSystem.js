@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.1
+// TacticsSystem.js v0.4.2
 //=============================================================================
 
 /*:
@@ -54,6 +54,38 @@
  * @desc The duration to display the phase sprite.
  * @default 120
  *
+ * @param show information window
+ * @desc Show the information battle window.
+ * @default 1
+ *
+ * @param text manager
+ * @default
+ *
+ * @param player phase term
+ * @parent text manager
+ * @desc The player phase term.
+ * @default Player Phase
+ *
+ * @param enemy phase term
+ * @parent text manager
+ * @desc The enemy phase term.
+ * @default Enemy Phase
+ *
+ * @param damage term (abbr.)
+ * @parent text manager
+ * @desc The damage abbrevation term.
+ * @default Dmg
+ *
+ * @param hit rate term (abbr.)
+ * @parent text manager
+ * @desc The hit rate abbrevation term.
+ * @default Hit
+ *
+ * @param critical rate term (abbr.)
+ * @parent text manager
+ * @desc The critical rate abbrevation term.
+ * @default Cri
+ *
  * @help
  *
  * For more information, please consult :
@@ -65,20 +97,26 @@
 var TacticsSystem = TacticsSystem || {};
 TacticsSystem.Parameters = PluginManager.parameters('TacticsSystem');
 
-TacticsSystem.cursorSpeed =         Number(TacticsSystem.Parameters['cursor speed']);
-TacticsSystem.gridOpacity =         Number(TacticsSystem.Parameters['grid opacity']);
-TacticsSystem.movePoints =          Number(TacticsSystem.Parameters['move points']);
-TacticsSystem.actionRange =         String(TacticsSystem.Parameters['action range']);
-TacticsSystem.moveScopeColor =      String(TacticsSystem.Parameters['move scope color']);
-TacticsSystem.allyScopeColor =      String(TacticsSystem.Parameters['ally scope color']);
-TacticsSystem.enemyScopeColor =     String(TacticsSystem.Parameters['enemy scope color']);
-TacticsSystem.animationIdOfDeath =  String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.animationIdOfDeath =  String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.animationIdOfDeath =  String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.showHpGauge =         Number(TacticsSystem.Parameters['show hp gauge']);
-TacticsSystem.showStateIcon =       Number(TacticsSystem.Parameters['show state icon']);
-TacticsSystem.showPhaseSprite =     Number(TacticsSystem.Parameters['show phase sprite']);
-TacticsSystem.durationPhaseSprite = Number(TacticsSystem.Parameters['duration phase sprite']);
+TacticsSystem.cursorSpeed =           Number(TacticsSystem.Parameters['cursor speed']);
+TacticsSystem.gridOpacity =           Number(TacticsSystem.Parameters['grid opacity']);
+TacticsSystem.movePoints =            Number(TacticsSystem.Parameters['move points']);
+TacticsSystem.actionRange =           String(TacticsSystem.Parameters['action range']);
+TacticsSystem.moveScopeColor =        String(TacticsSystem.Parameters['move scope color']);
+TacticsSystem.allyScopeColor =        String(TacticsSystem.Parameters['ally scope color']);
+TacticsSystem.enemyScopeColor =       String(TacticsSystem.Parameters['enemy scope color']);
+TacticsSystem.animationIdOfDeath =    String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.animationIdOfDeath =    String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.animationIdOfDeath =    String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.showHpGauge =           Number(TacticsSystem.Parameters['show hp gauge']);
+TacticsSystem.showStateIcon =         Number(TacticsSystem.Parameters['show state icon']);
+TacticsSystem.showPhaseSprite =       Number(TacticsSystem.Parameters['show phase sprite']);
+TacticsSystem.durationPhaseSprite =   Number(TacticsSystem.Parameters['duration phase sprite']);
+TacticsSystem.showInformationWindow = Number(TacticsSystem.Parameters['show information window']);
+TacticsSystem.playerPhaseTerm =       String(TacticsSystem.Parameters['player phase term']);
+TacticsSystem.enemyPhaseTerm =        String(TacticsSystem.Parameters['enemy phase term']);
+TacticsSystem.damageTerm =            String(TacticsSystem.Parameters['damage term (abbr.)']);
+TacticsSystem.hitRateTerm =           String(TacticsSystem.Parameters['hit rate term (abbr.)']);
+TacticsSystem.criticalRateTerm =      String(TacticsSystem.Parameters['critical rate term (abbr.)']);
 
 //-----------------------------------------------------------------------------
 // Scene_BattleTS
@@ -128,10 +166,8 @@ Scene_BattleTS.prototype.createAllWindows = function() {
     this.createHelpWindow();
     this.createSkillWindow();
     this.createItemWindow();
-    this.createActorWindow();
-    this.createEnemyWindow();
-    this.createEventWindow();
     this.createMessageWindow();
+    this.createInformationWindow();
 };
 
 Scene_BattleTS.prototype.createLogWindow = function() {
@@ -140,8 +176,12 @@ Scene_BattleTS.prototype.createLogWindow = function() {
 };
 
 Scene_BattleTS.prototype.createStatusWindow = function() {
-    this._statusWindow = new Window_BattleStatusTS();
-    this.addWindow(this._statusWindow);
+    this._statusSubjectWindow = new Window_BattleStatusTS();
+    this._statusSubjectWindow.x = Graphics.width/2 - this._statusSubjectWindow.width - 32;
+    this.addWindow(this._statusSubjectWindow);
+    this._statusTargetWindow = new Window_BattleStatusTS();
+    this._statusTargetWindow.x = Graphics.width/2 + 32;
+    this.addWindow(this._statusTargetWindow);
 };
 
 Scene_BattleTS.prototype.createActorCommandWindow = function() {
@@ -165,7 +205,6 @@ Scene_BattleTS.prototype.createSkillWindow = function() {
     var width = Graphics.boxWidth - this._actorCommandWindow.width;
     var height = this._actorCommandWindow.fittingHeight(4);
     this._skillWindow = new Window_BattleSkillTS(0, this._actorCommandWindow.y, width, height);
-    this._skillWindow.x = Graphics.boxWidth - this._skillWindow.width;
     this._skillWindow.setHelpWindow(this._helpWindow);
     this._skillWindow.setHandler('ok',     this.onSkillOk.bind(this));
     this._skillWindow.setHandler('cancel', this.onSkillCancel.bind(this));
@@ -176,35 +215,10 @@ Scene_BattleTS.prototype.createItemWindow = function() {
     var width = Graphics.boxWidth - this._actorCommandWindow.width;
     var height = this._actorCommandWindow.fittingHeight(4);
     this._itemWindow = new Window_BattleItemTS(0, this._actorCommandWindow.y, width, height);
-    this._itemWindow.x = Graphics.boxWidth - this._itemWindow.width;
     this._itemWindow.setHelpWindow(this._helpWindow);
     this._itemWindow.setHandler('ok',     this.onItemOk.bind(this));
     this._itemWindow.setHandler('cancel', this.onItemCancel.bind(this));
     this.addWindow(this._itemWindow);
-};
-
-Scene_BattleTS.prototype.createActorWindow = function() {
-    this._actorWindow = new Window_BattleActorTS(0, this._actorCommandWindow.y);
-    this._actorWindow.x = Graphics.boxWidth - this._actorWindow.width;
-    this._actorWindow.setHandler('ok',     this.onActorOk.bind(this));
-    this._actorWindow.setHandler('cancel', this.onActorCancel.bind(this));
-    this.addWindow(this._actorWindow);
-};
-
-Scene_BattleTS.prototype.createEnemyWindow = function() {
-    this._enemyWindow = new Window_BattleEnemyTS(0, this._actorCommandWindow.y);
-    this._enemyWindow.x = Graphics.boxWidth - this._enemyWindow.width;
-    this._enemyWindow.setHandler('ok',     this.onEnemyOk.bind(this));
-    this._enemyWindow.setHandler('cancel', this.onEnemyCancel.bind(this));
-    this.addWindow(this._enemyWindow);
-};
-
-Scene_BattleTS.prototype.createEventWindow = function() {
-    this._eventWindow = new Window_BattleEventTS(0, this._actorCommandWindow.y);
-    this._eventWindow.x = Graphics.boxWidth - this._eventWindow.width;
-    this._eventWindow.setHandler('ok',     this.onEventOk.bind(this));
-    this._eventWindow.setHandler('cancel', this.onEventCancel.bind(this));
-    this.addWindow(this._eventWindow);
 };
 
 Scene_BattleTS.prototype.createMessageWindow = function() {
@@ -215,9 +229,16 @@ Scene_BattleTS.prototype.createMessageWindow = function() {
     }, this);
 };
 
+Scene_BattleTS.prototype.createInformationWindow = function() {
+    this._informationWindow = new Window_BattleInformationTS();
+    this._informationWindow.y = Graphics.boxHeight - this._informationWindow.height;
+    this._informationWindow.y -= this._statusSubjectWindow.height;
+    this._informationWindow.x = Graphics.width/2 + 32;
+    this.addWindow(this._informationWindow);
+};
+
 Scene_BattleTS.prototype.start = function() {
     Scene_Base.prototype.start.call(this);
-    //BattleManagerTS.playBattleBgm();  see updateEncounterEffect
     BattleManagerTS.startBattle();
 };
 
@@ -228,7 +249,8 @@ Scene_BattleTS.prototype.update = function() {
     $gameMap.update(active);
     if (active && !this.isBusy()) {
         this.updateBattleProcess();
-        this.updateStatusWindow();
+        this.updateSubjectStatusWindow();
+        this.updateTargetStatusWindow();
     }
     $gameTimer.update(active);
     $gameScreen.update();
@@ -269,12 +291,12 @@ Scene_BattleTS.prototype.isBusy = function() {
             Scene_Base.prototype.isBusy.call(this));
 };
 
-Scene_BattleTS.prototype.updateStatusWindow = function() {
-    var select = $gameSelectorTS.select() || BattleManagerTS.subjectTS();
+Scene_BattleTS.prototype.updateSubjectStatusWindow = function() {
+    var select = BattleManagerTS.subjectTS() || $gameSelectorTS.select();
     if (this.canShowStatusWindow(select)) {
-        this._statusWindow.open(select);
+        this._statusSubjectWindow.open(select);
     } else {
-        this._statusWindow.close();
+        this._statusSubjectWindow.close();
     }
 };
 
@@ -282,16 +304,29 @@ Scene_BattleTS.prototype.canShowStatusWindow = function(select) {
     return select && select.isAlive();
 };
 
+Scene_BattleTS.prototype.updateTargetStatusWindow = function() {
+    var select = $gameSelectorTS.select();
+    if (this.canShowStatusWindow(select) && BattleManagerTS.isTargetSelection()) {
+        this._statusTargetWindow.open(select);
+        if (BattleManagerTS.canSelectTarget(select) && TacticsSystem.showInformationWindow) {
+            this._informationWindow.open(select);
+        } else {
+            this._informationWindow.close();
+        }
+    } else {
+        this._statusTargetWindow.close();
+        this._informationWindow.close();
+    }
+};
+
 Scene_BattleTS.prototype.isAnyInputWindowActive = function() {
     return (this._actorCommandWindow.active ||
             this._skillWindow.active ||
-            this._itemWindow.active ||
-            this._actorWindow.active ||
-            this._enemyWindow.active ||
-            this._eventWindow.active);
+            this._itemWindow.active);
 };
 
 Scene_BattleTS.prototype.startActorCommandSelection = function() {
+    this._statusSubjectWindow.show();
     this._actorCommandWindow.setup(BattleManagerTS.subject());
 };
 
@@ -304,7 +339,7 @@ Scene_BattleTS.prototype.commandAttack = function() {
 };
 
 Scene_BattleTS.prototype.commandSkill = function() {
-    this._statusWindow.hide();
+    this._statusSubjectWindow.hide();
     this._skillWindow.setActor(BattleManagerTS.subject());
     this._skillWindow.setStypeId(this._actorCommandWindow.currentExt());
     this._skillWindow.refresh();
@@ -319,14 +354,14 @@ Scene_BattleTS.prototype.commandGuard = function() {
 };
 
 Scene_BattleTS.prototype.commandItem = function() {
-    this._statusWindow.hide();
+    this._statusSubjectWindow.hide();
     this._itemWindow.refresh();
     this._itemWindow.show();
     this._itemWindow.activate();
 };
 
 Scene_BattleTS.prototype.commandAction = function() {
-    this.selectEventSelection();
+    this.onEventOk();
 };
 
 Scene_BattleTS.prototype.selectPreviousCommand = function() {
@@ -334,84 +369,17 @@ Scene_BattleTS.prototype.selectPreviousCommand = function() {
     this.endCommandSelection();
 };
 
-Scene_BattleTS.prototype.selectActorSelection = function() {
-    this._statusWindow.show();
-    this._actorWindow.refresh();
-    this._actorWindow.show();
-    this._actorWindow.activate();
-};
-
-Scene_BattleTS.prototype.onActorOk = function() {
-    var action = BattleManagerTS.inputtingAction();
-    action.setTarget(this._actorWindow.actorIndex());
-    this._actorWindow.show();
-    this._actorCommandWindow.close();
-    BattleManagerTS.setupAction();
-};
-
-Scene_BattleTS.prototype.onActorCancel = function() {
-    this._actorWindow.hide();
-    this._statusWindow.hide();
-    BattleManagerTS.processCancel();
-    switch (this._actorCommandWindow.currentSymbol()) {
-    case 'skill':
-        this._skillWindow.show();
-        this._skillWindow.activate();
-        break;
-    case 'item':
-        this._itemWindow.show();
-        this._itemWindow.activate();
-        break;
-    }
-};
-
-Scene_BattleTS.prototype.selectEnemySelection = function() {
-    this._statusWindow.show();
-    this._enemyWindow.refresh();
-    this._enemyWindow.show();
-    this._enemyWindow.select(0);
-    this._enemyWindow.activate();
-};
-
-Scene_BattleTS.prototype.onEnemyOk = function() {
-    var action = BattleManagerTS.inputtingAction();
-    action.setTarget(this._enemyWindow.enemyIndex());
-    this._enemyWindow.hide();
-    this._actorCommandWindow.close();
-    BattleManagerTS.setupAction();
-};
-
-Scene_BattleTS.prototype.onEnemyCancel = function() {
-    this._enemyWindow.hide();
-    BattleManagerTS.processCancel();
-    switch (this._actorCommandWindow.currentSymbol()) {
-    case 'attack':
-        this._actorCommandWindow.activate();
-        break;
-    case 'skill':
-        this._statusWindow.hide();
-        this._skillWindow.show();
-        this._skillWindow.activate();
-        break;
-    case 'item':
-        this._statusWindow.hide();
-        this._itemWindow.show();
-        this._itemWindow.activate();
-        break;
-    }
-};
-
 Scene_BattleTS.prototype.selectEventSelection = function() {
-    this._eventWindow.refresh();
-    this._eventWindow.show();
-    this._eventWindow.activate();
+    //this._eventWindow.refresh();
+    //this._eventWindow.show();
+    //this._eventWindow.activate();
 };
 
 Scene_BattleTS.prototype.onEventOk = function() {
-    var event = this._eventWindow.target();
+    var subject = BattleManagerTS.subjectTS();
+    var event = subject._actions[this._actorCommandWindow.index()-4];
     event.start();
     BattleManagerTS.startEvent();
-    this._eventWindow.hide();
     this._actorCommandWindow.close();
 };
 
@@ -421,6 +389,7 @@ Scene_BattleTS.prototype.onEventCancel = function() {
 };
 
 Scene_BattleTS.prototype.onSkillOk = function() {
+    this._statusSubjectWindow.show();
     var skill = this._skillWindow.item();
     var action = BattleManagerTS.inputtingAction();
     action.setSkill(skill.id);
@@ -430,12 +399,13 @@ Scene_BattleTS.prototype.onSkillOk = function() {
 
 Scene_BattleTS.prototype.onSkillCancel = function() {
     BattleManagerTS.processCancel();
-    this._statusWindow.show();
+    this._statusSubjectWindow.show();
     this._skillWindow.hide();
     this._actorCommandWindow.activate();
 };
 
 Scene_BattleTS.prototype.onItemOk = function() {
+    this._statusSubjectWindow.show();
     var item = this._itemWindow.item();
     var action = BattleManagerTS.inputtingAction();
     action.setItem(item.id);
@@ -445,7 +415,7 @@ Scene_BattleTS.prototype.onItemOk = function() {
 
 Scene_BattleTS.prototype.onItemCancel = function() {
     BattleManagerTS.processCancel();
-    this._statusWindow.show();
+    this._statusSubjectWindow.show();
     this._itemWindow.hide();
     this._actorCommandWindow.activate();
 };
@@ -454,14 +424,9 @@ Scene_BattleTS.prototype.onSelectAction = function() {
     var action = BattleManagerTS.inputtingAction();
     this._skillWindow.hide();
     this._itemWindow.hide();
-    if (!action.needsSelection()) {
-        this._actorCommandWindow.close();
-        BattleManagerTS.setupAction();
-    } else if (action.isForOpponent()) {
-        this.selectEnemySelection();
-    } else {
-        this.selectActorSelection();
-    }
+    this._actorCommandWindow.close();
+    $gameSelectorTS.updateSelect();
+    BattleManagerTS.playerTargetSelection();
 };
 
 Scene_BattleTS.prototype.endCommandSelection = function() {
@@ -475,7 +440,9 @@ Scene_BattleTS.prototype.stop = function() {
     } else {
         this.startFadeOut(this.fadeSpeed(), false);
     }
-    this._statusWindow.close();
+    this._statusSubjectWindow.close();
+    this._statusTargetWindow.close();
+    this._informationWindow.close();
 };
 
 Scene_BattleTS.prototype.needsSlowFadeOut = function() {
@@ -582,6 +549,7 @@ BattleManagerTS.active = function() {
         case 'preparation':
         case 'playerExplore':
         case 'playerSelect':
+        case 'playerTarget':
             return true;
         }
     }
@@ -602,6 +570,9 @@ BattleManagerTS.update = function() {
             break;
         case 'playerSelect':
             this.updateSelect();
+            break;
+        case 'playerTarget':
+            this.updateTarget();
             break;
         case 'startEnemy':
             this.startEnemyPhase();
@@ -668,7 +639,7 @@ BattleManagerTS.startTurn = function() {
     this._logWindow.startTurn();
     this.makePlayersOrder();
     this.makeEnemiesOrder();
-    this._spriteset.startPhase('Player Phase');
+    this._spriteset.startPhase(TacticsSystem.playerPhaseTerm);
     this._phase = 'startPlayer';
 };
 
@@ -767,8 +738,59 @@ BattleManagerTS.isStartPhase = function() {
     return this._phase === 'startPlayer' || this._phase === 'startEnemy';
 };
 
+BattleManagerTS.isTargetSelection = function() {
+    return this._phase === 'playerTarget';
+};
+
 BattleManagerTS.inputtingAction = function() {
     return this.subject().inputtingAction();
+};
+
+BattleManagerTS.updateTarget = function() {
+    var select = $gameSelectorTS.select();
+    if (this.isTriggered()) {
+        BattleManagerTS.playerTargetOk(select);
+    }
+    if (this.isCancelled()) {
+        BattleManagerTS.playerTargetCancel();
+    }
+};
+
+BattleManagerTS.playerTargetOk = function(select) {
+    if (this.canSelectTarget(select)) {
+        SoundManager.playOk();
+        BattleManagerTS.onTargetOk(select);
+    } else {
+        SoundManager.playBuzzer();
+    }
+};
+
+BattleManagerTS.playerTargetCancel = function() {
+    var x = this._subject.x;
+    var y = this._subject.y;
+    SoundManager.playCancel();
+    $gameSelectorTS.performTransfer(x, y);
+    $gameMap.eraseTiles();
+    this._phase = 'input';
+};
+
+BattleManagerTS.onTargetOk = function(target) {
+    var action = BattleManagerTS.inputtingAction();
+    action.setTarget(target.battler().index());
+    BattleManagerTS.setupAction();
+};
+
+BattleManagerTS.canSelectTarget = function(subject) {
+    return $gameMap.isOnTiles($gameSelectorTS.x, $gameSelectorTS.y) && this.selectIsValidForTarget(subject);
+};
+
+BattleManagerTS.selectIsValidForTarget = function(subject) {
+    var action = BattleManagerTS.inputtingAction();
+    if (action.isForOpponent()) {
+        return subject && !subject.isActor();
+    } else {
+        return subject && subject.isActor();
+    }
 };
 
 BattleManagerTS.endPlayerPhase = function() {
@@ -779,7 +801,7 @@ BattleManagerTS.endPlayerPhase = function() {
         this._logWindow.displayAutoAffectedStatus(enemy);
         this._logWindow.displayRegeneration(enemy);
     }, this);
-    this._spriteset.startPhase('Enemy Phase');
+    this._spriteset.startPhase(TacticsSystem.enemyPhaseTerm);
     this._phase = 'startEnemy';
 };
 
@@ -1127,7 +1149,7 @@ BattleManagerTS.isBattleEnd = function() {
 };
 
 BattleManagerTS.isTriggered = function() {
-    return Input.isTriggered('ok') || $gameSelectorTS.triggerTouchAction();
+    return Input.isTriggered('ok'); //$gameSelectorTS.triggerTouchAction();
 };
 
 BattleManagerTS.isCancelled = function() {
@@ -1161,6 +1183,10 @@ BattleManagerTS.terminate = function() {
 
 BattleManagerTS.startEvent = function() {
     this._phase = 'action';
+};
+
+BattleManagerTS.playerTargetSelection = function() {
+    this._phase = 'playerTarget'
 };
 
 //-----------------------------------------------------------------------------
@@ -1946,7 +1972,12 @@ Window_ActorCommandTS.prototype = Object.create(Window_ActorCommand.prototype);
 Window_ActorCommandTS.prototype.constructor = Window_ActorCommandTS;
 
 Window_ActorCommandTS.prototype.initialize = function() {
-    Window_ActorCommand.prototype.initialize.call(this);
+    var x = Graphics.boxWidth - this.windowWidth();
+    var y = Graphics.boxHeight - this.windowHeight();
+    Window_Command.prototype.initialize.call(this, x, y);
+    this.openness = 0;
+    this.deactivate();
+    this._actor = null;
 };
 
 Window_ActorCommandTS.prototype.setup = function(actor) {
@@ -1970,10 +2001,12 @@ Window_ActorCommandTS.prototype.makeCommandList = function() {
 Window_ActorCommandTS.prototype.addActionCommand = function() {
     var friendsUnitTS = this._actor.friendsUnitTS();
     var actorTS = friendsUnitTS.getBattlerTS(this._actor);
-    if (actorTS.canAction()) {
-        this.addCommand('Action', 'action');
-    }
+    actorTS.checkEventTriggerThere();
+    actorTS.actions().forEach(function(action) {
+        this.addCommand(action.name(), 'action');
+    }, this);
 };
+
 
 //-----------------------------------------------------------------------------
 // Window_BattleStatusTS
@@ -1988,17 +2021,16 @@ Window_BattleStatusTS.prototype = Object.create(Window_Base.prototype);
 Window_BattleStatusTS.prototype.constructor = Window_BattleStatusTS;
 
 Window_BattleStatusTS.prototype.initialize = function() {
+    var y = Graphics.boxHeight - (this.windowHeight());
     var width = this.windowWidth();
     var height = this.windowHeight();
-    var x = Graphics.boxWidth - (this.windowWidth());
-    var y = 0;
-    Window_Base.prototype.initialize.call(this, x, y, width, height);
+    Window_Base.prototype.initialize.call(this, 0, y, width, height);
     this.openness = 0;
     this._battlerTS = null;
 };
 
 Window_BattleStatusTS.prototype.windowWidth = function() {
-    return 420;
+    return 816/2 - 32;
 };
 
 Window_BattleStatusTS.prototype.windowHeight = function() {
@@ -2021,16 +2053,28 @@ Window_BattleStatusTS.prototype.refresh = function() {
     this.contents.clear();
     if (battler.isActor()) {
         this.drawActorFace(battler, 0, 0, Window_Base._faceWidth, Window_Base._faceHeight);
-        this.drawActorSimpleStatus(battler, 0, 0, 420);
+        this.drawActorSimpleStatus(battler, 0, 0, 376);
     } else {
         this.drawEnemyImage(battler, 0, 0);
-        this.drawEnemySimpleStatus(battler, 0, 0, 420);
+        this.drawEnemySimpleStatus(battler, 0, 0, 376);
     }
+};
+
+Window_BattleStatusTS.prototype.drawActorSimpleStatus = function(actor, x, y, width) {
+    var lineHeight = this.lineHeight();
+    var x2 = x + 150;
+    var width2 = Math.min(200, width - 180 - this.textPadding());
+    this.drawActorName(actor, x, y);
+    this.drawActorLevel(actor, x, y + lineHeight * 1);
+    this.drawActorIcons(actor, x, y + lineHeight * 2);
+    this.drawActorClass(actor, x2, y);
+    this.drawActorHp(actor, x2, y + lineHeight * 1, width2);
+    this.drawActorMp(actor, x2, y + lineHeight * 2, width2);
 };
 
 Window_BattleStatusTS.prototype.drawEnemySimpleStatus = function(enemy, x, y, width) {
     var lineHeight = this.lineHeight();
-    var x2 = x + 180;
+    var x2 = x + 150;
     var width2 = Math.min(200, width - 180 - this.textPadding());
     this.drawActorName(enemy, x2, y);
     this.drawActorHp(enemy, x2, y + lineHeight * 1, width2);
@@ -2049,222 +2093,6 @@ Window_BattleStatusTS.prototype.drawEnemyImage = function(battler, x, y) {
     var dy = Math.floor(y + Math.max(height - ph, 0) / 2);
     var q = 150 / Math.max(bitmap.width, bitmap.height)
     this.contents.blt(bitmap, 0, 0, pw, ph, 0, 0, bitmap.width * q, bitmap.height * q);
-};
-
-//-----------------------------------------------------------------------------
-// Window_BattleTarget
-//
-// The window for selecting a target on the battle screen.
-
-function Window_BattleTargetTS() {
-    this.initialize.apply(this, arguments);
-}
-
-Window_BattleTargetTS.prototype = Object.create(Window_Selectable.prototype);
-Window_BattleTargetTS.prototype.constructor = Window_BattleTargetTS;
-
-Window_BattleTargetTS.prototype.initialize = function(x, y) {
-    var width = this.windowWidth();
-    var height = this.windowHeight();
-    Window_Selectable.prototype.initialize.call(this, x, y, width, height);
-    this.hide();
-};
-
-Window_BattleTargetTS.prototype.windowWidth = function() {
-    return Graphics.boxWidth - 192;
-};
-
-Window_BattleTargetTS.prototype.windowHeight = function() {
-    return this.fittingHeight(this.numVisibleRows());
-};
-
-Window_BattleTargetTS.prototype.numVisibleRows = function() {
-    return 4;
-};
-
-Window_BattleTargetTS.prototype.maxCols = function() {
-    return 2;
-};
-
-Window_BattleTargetTS.prototype.maxItems = function() {
-    return 0;
-};
-
-Window_BattleTargetTS.prototype.target = function() {
-    return null;
-};
-
-Window_BattleTargetTS.prototype.show = function() {
-    this.refresh();
-    this.select(0);
-    BattleManagerTS.performTransfer(this.target());
-    Window_Selectable.prototype.show.call(this);
-};
-
-Window_BattleTargetTS.prototype.processCursorMove = function () {
-    var lastIndex = this.index();
-    Window_Selectable.prototype.processCursorMove.call(this);
-    if (this.index() !== lastIndex) {
-        BattleManagerTS.performTransfer(this.target());
-    }
-};
-
-Window_BattleTargetTS.prototype.onTouch = function(triggered) {
-    var lastIndex = this.index();
-    Window_Selectable.prototype.onTouch.call(this, triggered);
-    if (this.index() !== lastIndex) {
-        BattleManagerTS.performTransfer(this.target());
-    }
-};
-
-//-----------------------------------------------------------------------------
-// Window_BattleActorTS
-//
-// The window for selecting a target actor on the battle screen.
-
-function Window_BattleActorTS() {
-    this.initialize.apply(this, arguments);
-}
-
-Window_BattleActorTS.prototype = Object.create(Window_BattleTargetTS.prototype);
-Window_BattleActorTS.prototype.constructor = Window_BattleActorTS;
-
-Window_BattleActorTS.prototype.initialize = function(x, y) {
-    this._actors = [];
-    Window_BattleTargetTS.prototype.initialize.call(this, x, y);
-};
-
-Window_BattleActorTS.prototype.maxItems = function() {
-    return this._actors.length;
-};
-
-Window_BattleActorTS.prototype.target = function() {
-    return this._actors[this.index()];
-};
-
-Window_BattleActorTS.prototype.actorIndex = function() {
-    var actor = this.target().battler();
-    return actor ? actor.index() : -1;
-};
-
-Window_BattleActorTS.prototype.drawItem = function(index) {
-    this.resetTextColor();
-    if (this._actors[index]) {
-        var name = this._actors[index].battler().name();
-        var rect = this.itemRectForText(index);
-        this.drawText(name, rect.x, rect.y, rect.width);
-    }
-};
-
-Window_BattleActorTS.prototype.hide = function() {
-    Window_BattleTargetTS.prototype.hide.call(this);
-    $gameParty.select(null);
-};
-
-Window_BattleActorTS.prototype.refresh = function() {
-    this._actors = $gamePartyTS.battleMembers();
-    Window_BattleTargetTS.prototype.refresh.call(this);
-};
-
-Window_BattleActorTS.prototype.select = function(index) {
-    Window_BattleTargetTS.prototype.select.call(this, index);
-    $gameParty.select(this.target());
-};
-
-//-----------------------------------------------------------------------------
-// Window_BattleEnemyTS
-//
-// The window for selecting a target enemy on the battle screen.
-
-function Window_BattleEnemyTS() {
-    this.initialize.apply(this, arguments);
-}
-
-Window_BattleEnemyTS.prototype = Object.create(Window_BattleTargetTS.prototype);
-Window_BattleEnemyTS.prototype.constructor = Window_BattleEnemyTS;
-
-Window_BattleEnemyTS.prototype.initialize = function(x, y) {
-    this._enemies = [];
-    Window_BattleTargetTS.prototype.initialize.call(this, x, y);
-};
-
-Window_BattleEnemyTS.prototype.maxItems = function() {
-    return this._enemies.length;
-};
-
-Window_BattleEnemyTS.prototype.target = function() {
-    return this._enemies[this.index()];
-};
-
-Window_BattleEnemyTS.prototype.enemyIndex = function() {
-    var enemy = this.target().battler();
-    return enemy ? enemy.index() : -1;
-};
-
-Window_BattleEnemyTS.prototype.drawItem = function(index) {
-    this.resetTextColor();
-    var name = this._enemies[index].battler().name();
-    var rect = this.itemRectForText(index);
-    this.drawText(name, rect.x, rect.y, rect.width);
-};
-
-Window_BattleEnemyTS.prototype.hide = function() {
-    Window_BattleTargetTS.prototype.hide.call(this);
-    $gameTroop.select(null);
-};
-
-Window_BattleEnemyTS.prototype.refresh = function() {
-    this._enemies = $gameTroopTS.battleMembers();
-    Window_BattleTargetTS.prototype.refresh.call(this);
-};
-
-Window_BattleEnemyTS.prototype.select = function(index) {
-    Window_BattleTargetTS.prototype.select.call(this, index);
-    $gameTroop.select(this.target());
-};
-
-//-----------------------------------------------------------------------------
-// Window_BattleEvent
-//
-// The window for selecting a event on the battle screen.
-
-function Window_BattleEventTS() {
-    this.initialize.apply(this, arguments);
-}
-
-Window_BattleEventTS.prototype = Object.create(Window_BattleTargetTS.prototype);
-Window_BattleEventTS.prototype.constructor = Window_BattleEventTS;
-
-Window_BattleEventTS.prototype.initialize = function(x, y) {
-    this._actions = [];
-    // bad idea to call that this._events !
-    // initialize create an attribute "this._events" that is an empty object
-    // come from Pixi's EventEmitter !
-    Window_BattleTargetTS.prototype.initialize.call(this, x, y);
-};
-
-Window_BattleEventTS.prototype.maxItems = function() {
-    return this._actions.length;
-};
-
-Window_BattleEventTS.prototype.target = function() {
-    return this._actions[this.index()];
-};
-
-Window_BattleEventTS.prototype.drawItem = function(index) {
-    this.resetTextColor();
-    var name = this._actions[index].name();
-    var rect = this.itemRectForText(index);
-    this.drawText(name, rect.x, rect.y, rect.width);
-};
-
-
-Window_BattleEventTS.prototype.refresh = function() {
-    var subject = BattleManagerTS.subjectTS();
-    if (subject) {
-        this._actions = subject.actions();
-    }
-    Window_BattleTargetTS.prototype.refresh.call(this);
 };
 
 //-----------------------------------------------------------------------------
@@ -2318,7 +2146,7 @@ function Window_BattleItemTS() {
 }
 
 Window_BattleItemTS.prototype = Object.create(Window_BattleItem.prototype);
-Window_BattleItemTS.prototype.constructor = Window_BattleSkillTS;
+Window_BattleItemTS.prototype.constructor = Window_BattleItemTS;
 
 Window_BattleItemTS.prototype.processCursorMove = function() {
     var lastIndex = this.index();
@@ -2337,6 +2165,123 @@ Window_BattleItemTS.prototype.show = function() {
         action.setItem(this.item().id);
         BattleManagerTS.refreshRedCells(action);
     }
+};
+
+//-----------------------------------------------------------------------------
+// Window_BattleInformationTS
+//
+// The window for displaying the combat information on the battle screen.
+
+function Window_BattleInformationTS() {
+    this.initialize.apply(this, arguments);
+}
+
+Window_BattleInformationTS.prototype = Object.create(Window_Base.prototype);
+Window_BattleInformationTS.prototype.constructor = Window_BattleInformationTS;
+
+Window_BattleInformationTS.prototype.initialize = function() {
+    var width = this.windowWidth();
+    var height = this.windowHeight();
+    Window_Base.prototype.initialize.call(this, 0, 0, width, height);
+    this.openness = 0;
+};
+
+Window_BattleInformationTS.prototype.windowWidth = function() {
+    return 816/2 - 32;
+};
+
+Window_BattleInformationTS.prototype.windowHeight = function() {
+    return 64;
+};
+
+Window_BattleInformationTS.prototype.windowHeight = function() {
+    return this.fittingHeight(this.numVisibleRows());
+};
+
+Window_BattleInformationTS.prototype.numVisibleRows = function() {
+    return 1;
+};
+
+Window_BattleInformationTS.prototype.open = function(battlerTS) {
+    this.refresh(battlerTS.battler());
+    Window_Base.prototype.open.call(this);
+};
+
+Window_BattleInformationTS.prototype.refresh = function(battler) {
+    this.contents.clear();
+    this.drawItem(battler);
+};
+
+Window_BattleInformationTS.prototype.drawItem = function(battler) {
+    this.drawDamage(battler, 0, 0, 80);
+    this.drawHit(battler, 130, 0, 80);
+    this.drawCri(battler, 235, 0, 80);
+};
+
+Window_BattleInformationTS.prototype.drawBattlerLevel = function(actor, x, y) {
+    this.changeTextColor(this.systemColor());
+    this.drawText(TextManager.levelA, x, y, 48);
+    this.resetTextColor();
+    this.drawText(actor.level, x, y, 36, 'right');
+};
+
+Window_BattleInformationTS.prototype.drawBattlerHp = function(actor, x, y, width) {
+    width = width || 186;
+    this.changeTextColor(this.systemColor());
+    this.drawText(TextManager.hpA, x, y, 44);
+    this.drawCurrentAndMax(actor.hp, actor.mhp, x, y, width,
+                           this.hpColor(actor), this.normalColor());
+};
+
+Window_BattleInformationTS.prototype.drawBattlerMp = function(actor, x, y, width) {
+    width = width || 186;
+    this.changeTextColor(this.systemColor());
+    this.drawText(TextManager.mpA, x, y, 44);
+    this.drawCurrentAndMax(actor.mp, actor.mmp, x, y, width,
+                           this.mpColor(actor), this.normalColor());
+};
+
+Window_BattleInformationTS.prototype.drawCurrentAndMax = function(current, max, x, y,
+                                                                  width, color1, color2) {
+    var labelWidth = this.textWidth('HP');
+    var valueWidth = this.textWidth('00');
+    var slashWidth = this.textWidth('/');
+    var x1 = x + width - valueWidth;
+    var x2 = x1 - slashWidth;
+    var x3 = x2 - valueWidth;
+    this.changeTextColor(color1);
+    this.drawText(current, x3, y, valueWidth, 'right');
+    this.changeTextColor(color2);
+    this.drawText('/', x2, y, slashWidth, 'right');
+    this.drawText(max, x1, y, valueWidth, 'right');
+};
+
+Window_BattleInformationTS.prototype.drawDamage = function(actor, x, y, width) {
+    this.changeTextColor(this.systemColor());
+    this.drawText(TacticsSystem.damageTerm, x, 0, 30);
+    this.resetTextColor();
+    var action = BattleManagerTS.inputtingAction();
+    var minHit = action.makeDamageMinMaxValue(actor, false);
+    var maxHit = action.makeDamageMinMaxValue(actor, true);
+    this.drawText(minHit + '-' + maxHit, x + 45, 0, 65, 'right');
+};
+
+Window_BattleInformationTS.prototype.drawHit = function(actor, x, y, width) {
+    this.changeTextColor(this.systemColor());
+    this.drawText(TacticsSystem.hitRateTerm, x, y, 30);
+    this.resetTextColor();
+    var action = BattleManagerTS.inputtingAction();
+    var hit = action.itemHit(actor) * 100 + '%';
+    this.drawText(hit, x + 35, y, 50, 'right');
+};
+
+Window_BattleInformationTS.prototype.drawCri = function(actor, x, y, width) {
+    this.changeTextColor(this.systemColor());
+    this.drawText(TacticsSystem.criticalRateTerm, x, y, 30);
+    this.resetTextColor();
+    var action = BattleManagerTS.inputtingAction();
+    var hit = action.itemCri(actor) * 100 + '%';
+    this.drawText(hit, x + 35, y, 50, 'right');
 };
 
 //-----------------------------------------------------------------------------
@@ -2418,7 +2363,7 @@ Sprite_GridTS.prototype.update = function() {
 //-----------------------------------------------------------------------------
 // Spriteset_MapTS
 //
-// The sprite for displaying a selector.
+// The set of sprites on the map screen.
 
 function Spriteset_MapTS() {
     this.initialize.apply(this, arguments);
@@ -2983,6 +2928,31 @@ Game_Action.prototype.showRange = function() {
 Game_Action.prototype.color = function() {
     return this.isForFriend() ? TacticsSystem.allyScopeColor : TacticsSystem.enemyScopeColor;
 }
+
+Game_Action.prototype.makeDamageMinMaxValue = function(target, minMax) {
+    var item = this.item();
+    var baseValue = this.evalDamageFormula(target);
+    var value = baseValue * this.calcElementRate(target);
+    if (this.isPhysical()) {
+        value *= target.pdr;
+    }
+    if (this.isMagical()) {
+        value *= target.mdr;
+    }
+    if (baseValue < 0) {
+        value *= target.rec;
+    }
+    value = this.applyMinMaxVariance(value, item.damage.variance, minMax);
+    value = this.applyGuard(value, target);
+    value = Math.round(value);
+    return value;
+};
+
+Game_Action.prototype.applyMinMaxVariance = function(damage, variance, minMax) {
+    var amp = Math.floor(Math.max(Math.abs(damage) * variance / 100, 0));
+    var v = minMax ? amp : - amp;
+    return damage >= 0 ? damage + v : damage - v;
+};
 
 //-----------------------------------------------------------------------------
 // Game_BattlerBase
