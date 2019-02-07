@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.2
+// TacticsSystem.js v0.4.2.1
 //=============================================================================
 
 /*:
@@ -1149,7 +1149,7 @@ BattleManagerTS.isBattleEnd = function() {
 };
 
 BattleManagerTS.isTriggered = function() {
-    return Input.isTriggered('ok'); //$gameSelectorTS.triggerTouchAction();
+    return Input.isTriggered('ok') || $gameSelectorTS.triggerTouchAction();
 };
 
 BattleManagerTS.isCancelled = function() {
@@ -1220,6 +1220,8 @@ Game_SelectorTS.prototype.initMembers = function() {
     this._select = null;
     this._hadMoved = false;
     this._transparent = false;
+    this._scrolledX = 0;
+    this._scrolledY = 0;
 };
 
 Game_SelectorTS.prototype.pos = function(x, y) {
@@ -1232,7 +1234,7 @@ Game_SelectorTS.prototype.setPosition = function(x, y) {
 };
 
 Game_SelectorTS.prototype.isWaiting = function() {
-    return this._wait >= 0;
+    return this._wait > 0;
 };
 
 Game_SelectorTS.prototype.select = function() {
@@ -1249,14 +1251,14 @@ Game_SelectorTS.prototype.getInputDirection = function() {
 
 Game_SelectorTS.prototype.update = function(active) {
     if (active) {
-        var scrolledX = this.scrolledX();
-        var scrolledY = this.scrolledY();
         this.moveByInput();
         this.moveByDestination();
         this.updateMove();
-        this.updateScroll(scrolledX, scrolledY);
+        this.updateScroll(this._scrolledX, this._scrolledY);
         this.updateWait();
     }
+    this._scrolledX = this.scrolledX();
+    this._scrolledY = this.scrolledY();
 };
 
 Game_SelectorTS.prototype.distancePerFrame = function() {
