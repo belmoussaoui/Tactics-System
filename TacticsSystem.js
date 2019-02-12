@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.2.1
+// TacticsSystem.js v0.4.2.2
 //=============================================================================
 
 /*:
@@ -824,7 +824,7 @@ BattleManagerTS.updateEnemyPhase = function() {
     this._subject.updateRange();
     $gameTroop.setupTS([this.subject()]);
     var pos = this._subject.makeMove();
-    $gameSelectorTS.performTransfer(pos.x, pos.y);
+    $gameSelectorTS.performTransfer(pos.x, pos.y);  // scrollTo
     this.subject().makeActions();
     $gameMap.eraseTiles();
     this._phase = 'move';
@@ -882,7 +882,7 @@ BattleManagerTS.updateAction = function() {
     if (target) {
         var friendsUnitTS = target.friendsUnitTS();
         var battler = friendsUnitTS.getBattlerTS(target);
-        BattleManagerTS.performTransfer(battler);
+        $gameSelectorTS.performTransfer(battler.x, battler.y);
         this.invokeAction(this.subject(), target);
     } else {
         this._logWindow.endAction(this.subject());
@@ -980,10 +980,6 @@ BattleManagerTS.processCancel = function() {
     var x = this._subject.x;
     var y = this._subject.y;
     $gameSelectorTS.performTransfer(x, y);
-};
-
-BattleManagerTS.performTransfer = function(battler) {
-    $gameSelectorTS.performTransfer(battler.x, battler.y);
 };
 
 BattleManagerTS.selectPreviousCommand = function() {
@@ -3062,11 +3058,11 @@ Game_Map.prototype.addTile = function(tile) {
 };
 
 Game_Map.prototype.positionTileX = function(tile) {
-    return Math.floor(tile / $dataMap.width);
+    return tile % $dataMap.width;
 };
 
 Game_Map.prototype.positionTileY = function(tile) {
-    return tile % $dataMap.width;
+    return Math.floor(tile / $dataMap.width);
 };
 
 Game_Map.prototype.isTileAdded = function(tile) {
@@ -3074,7 +3070,7 @@ Game_Map.prototype.isTileAdded = function(tile) {
 };
 
 Game_Map.prototype.tile = function(x, y) {
-    return x * $dataMap.width + y;
+    return y * $dataMap.width + x;
 };
 
 Game_Map.prototype.tiles = function() {
