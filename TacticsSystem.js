@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.2.2
+// TacticsSystem.js v0.4.2.3
 //=============================================================================
 
 /*:
@@ -369,15 +369,9 @@ Scene_BattleTS.prototype.selectPreviousCommand = function() {
     this.endCommandSelection();
 };
 
-Scene_BattleTS.prototype.selectEventSelection = function() {
-    //this._eventWindow.refresh();
-    //this._eventWindow.show();
-    //this._eventWindow.activate();
-};
-
 Scene_BattleTS.prototype.onEventOk = function() {
     var subject = BattleManagerTS.subjectTS();
-    var event = subject._actions[this._actorCommandWindow.index()-4];
+    var event = subject.actions()[this._actorCommandWindow.index()];
     event.start();
     BattleManagerTS.startEvent();
     this._actorCommandWindow.close();
@@ -1988,11 +1982,11 @@ Window_ActorCommandTS.prototype.setup = function(actor) {
 
 Window_ActorCommandTS.prototype.makeCommandList = function() {
     if (this._actor) {
+        this.addActionCommand();
         this.addAttackCommand();
         this.addSkillCommands();
         this.addGuardCommand();
         this.addItemCommand();
-        this.addActionCommand();
     }
 };
 
@@ -2066,8 +2060,14 @@ Window_BattleStatusTS.prototype.drawActorSimpleStatus = function(actor, x, y, wi
     this.drawActorLevel(actor, x, y + lineHeight * 1);
     this.drawActorIcons(actor, x, y + lineHeight * 2);
     this.drawActorClass(actor, x2, y);
-    this.drawActorHp(actor, x2, y + lineHeight * 1, width2);
-    this.drawActorMp(actor, x2, y + lineHeight * 2, width2);
+    if ($dataSystem.optDisplayTp) {
+        this.drawActorHp(actor, x2, y + lineHeight * 1, width2);
+        this.drawActorMp(actor, x2, y + lineHeight * 2, width2);
+        this.drawActorTp(actor, x2, y + lineHeight * 3, width2);
+    } else {
+        this.drawActorHp(actor, x2, y + lineHeight * 1, width2);
+        this.drawActorMp(actor, x2, y + lineHeight * 2, width2);
+    }
 };
 
 Window_BattleStatusTS.prototype.drawEnemySimpleStatus = function(enemy, x, y, width) {
