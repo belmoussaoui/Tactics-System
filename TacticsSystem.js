@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.4.2.3
+// TacticsSystem.js v0.4.2.4
 //=============================================================================
 
 /*:
@@ -493,9 +493,11 @@ BattleManagerTS.createGameObjects = function() {
         var event = $gameMap.events()[i];
         var meta = event.meta();
         if (parseInt(meta['actor']) > 0) {
-            this.createGameActors(actors, event);
+            this.createGameActors1(actors, event);
         } else if (parseInt(meta['enemy']) > 0) {
             this.createGameEnemies(enemies, event);
+        } else if (parseInt(meta['party']) >= 0) {
+            this.createGameActors2(actors, event)
         }
     }
     this.setupGameObjectsTS(actors, enemies);
@@ -506,9 +508,15 @@ BattleManagerTS.setupGameObjectsTS = function(actors, enemies) {
     $gameTroopTS.setup(enemies);
 };
 
-BattleManagerTS.createGameActors = function(actors, event) {
+BattleManagerTS.createGameActors1 = function(actors, event) {
     var actorId = parseInt(event.meta()['actor']);
     actors.push(new Game_ActorTS(event, actorId));
+};
+
+BattleManagerTS.createGameActors2 = function(actors, event) {
+    var partyId = parseInt(event.meta()['party']);
+    var actor = $gameParty.members()[partyId]
+    actors.push(new Game_ActorTS(event, actor.actorId()));
 };
 
 BattleManagerTS.createGameEnemies = function(enemies, event) {
