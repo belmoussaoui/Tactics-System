@@ -1,10 +1,10 @@
 //=============================================================================
-// TacticsSystem.js v0.4.2.4
+// TacticsSystem.js v0.5
 //=============================================================================
 
 /*:
  * @plugindesc A Tactical Battle System like Final Fantasy Tactics or Fire Emblem series.
- * @author El Moussaoui Bilal (https://twitter.com/embxii_)
+ * @author El Moussaoui Bilal (https://twitter.com/belmouss_)
  *
  * @param cursor speed
  * @desc The cursor speed. 1: Slow, 2: Normal, 3: Fast
@@ -112,11 +112,10 @@ TacticsSystem.showStateIcon =         Number(TacticsSystem.Parameters['show stat
 TacticsSystem.showPhaseSprite =       Number(TacticsSystem.Parameters['show phase sprite']);
 TacticsSystem.durationPhaseSprite =   Number(TacticsSystem.Parameters['duration phase sprite']);
 TacticsSystem.showInformationWindow = Number(TacticsSystem.Parameters['show information window']);
-TacticsSystem.playerPhaseTerm =       String(TacticsSystem.Parameters['player phase term']);
-TacticsSystem.enemyPhaseTerm =        String(TacticsSystem.Parameters['enemy phase term']);
 TacticsSystem.damageTerm =            String(TacticsSystem.Parameters['damage term (abbr.)']);
 TacticsSystem.hitRateTerm =           String(TacticsSystem.Parameters['hit rate term (abbr.)']);
 TacticsSystem.criticalRateTerm =      String(TacticsSystem.Parameters['critical rate term (abbr.)']);
+//show turn
 
 //-----------------------------------------------------------------------------
 // Scene_BattleTS
@@ -482,8 +481,7 @@ BattleManagerTS.initMembers = function() {
     this._troopId = 0;
     this._isBattleEnd = false;
     this._turn = 0;
-    this._playersOrder = [];
-    this._enemiesOrder = [];
+    this._actionBattlers = [];
 };
 
 BattleManagerTS.createGameObjects = function() {
@@ -567,17 +565,11 @@ BattleManagerTS.update = function() {
         case 'startPlayer':
             this.startPlayerPhase();
             break;
-        case 'playerExplore':
-            this.updateExplore();
-            break;
         case 'playerSelect':
             this.updateSelect();
             break;
         case 'playerTarget':
             this.updateTarget();
-            break;
-        case 'startEnemy':
-            this.startEnemyPhase();
             break;
         case 'move':
             this.updateMove();
@@ -636,72 +628,75 @@ BattleManagerTS.startTurn = function() {
     $gameTroop.increaseTurn();
     $gameTroopTS.onTurnStart();
     $gamePartyTS.onTurnStart();
-    $gameSelectorTS.setTransparent(true);
-    $gameSelectorTS.restorePosition();
     this._logWindow.startTurn();
-    this.makePlayersOrder();
-    this.makeEnemiesOrder();
-    this._spriteset.startPhase(TacticsSystem.playerPhaseTerm);
+    this.makeActionOrders();
     this._phase = 'startPlayer';
 };
 
-BattleManagerTS.makePlayersOrder = function() {
-    var battlers = $gamePartyTS.restrictedMembers();
-    // agiliy sort...
-    this._playersOrder = battlers;
+BattleManagerTS.makeActionOrders = function() {
+    var battlers = [];
+    if (!this._surprise) {
+        battlers = battlers.concat($gamePartyTS.members());
+    }
+    if (!this._preemptive) {
+        battlers = battlers.concat($gameTroopTS.members());
+    }
+    battlers.forEach(function(battler) {
+        battler.battler().makeSpeed();
+    });
+    battlers.sort(function(a, b) {
+        return b.battler().speed() - a.battler().speed();
+    });
+    this._actionBattlers = battlers;
 };
 
-BattleManagerTS.makeEnemiesOrder = function() {
-    var battlers = $gameTroopTS.aliveMembers();
-    // agility sort...
-    this._enemiesOrder = battlers;
-};
-
-BattleManagerTS.getNextPlayer = function() {
-    return this._playersOrder.shift();
-};
-
-BattleManagerTS.getNextEnemy = function() {
-    return this._enemiesOrder.shift();
+BattleManagerTS.getNextSubject = function() {
+    for (;;) {
+        var battler = this._actionBattlers.shift();
+        if (!battler) {
+            return null;
+        }
+        if (battler.isAlive()) {
+            return battler;
+        }
+    }
 };
 
 BattleManagerTS.startPlayerPhase = function() {
-    $gameSelectorTS.setTransparent(false);
-    this._subject = this.getNextPlayer();
+    this._subject = this.getNextSubject();
+    $gameSelectorTS.setSelect(this._subject);
     if (this._subject) {
-        this.updatePlayerPhase();
-    } else if (this.isPlayerPhase()) {
-        this.refreshBlueCells();
-        this._phase = 'playerExplore';
+        if (this._subject.isActor()) {
+            this.updatePlayerPhase();
+        } else {
+            this.updateEnemyPhase();
+        }
     } else {
-        this.endPlayerPhase();
+        this.startTurn();
     }
 };
 
 BattleManagerTS.updatePlayerPhase = function() {
-    // see updateEnemiePhase !
     this._subject.updateRange();
+    this._subject.savePosition();
+    $gameMap.setMoveColor();
     $gameParty.setupTS([this._subject.battler()]);
     var pos = this._subject.makeMove();
     $gameSelectorTS.performTransfer(pos.x, pos.y);
     this.subject().makeActions();
+    this._phase = 'playerSelect';
+};
+
+BattleManagerTS.updateEnemyPhase = function() {
+    this._subject.updateRange();
+    $gameTroop.setupTS([this.subject()]);
+    var pos = this._subject.makeMove();
+    $gameSelectorTS.performTransfer(pos.x, pos.y);  // scrollTo
+    this.subject().makeActions();
+    $gameMap.eraseTiles();
     this._phase = 'move';
 };
 
-BattleManagerTS.isPlayerPhase = function() {
-    return $gamePartyTS.isPhase();
-};
-
-BattleManagerTS.updateExplore = function() {
-    this.refreshBlueCells();
-    if (this.canSelectActor($gameSelectorTS.select())) {
-        SoundManager.playOk();
-        this._subject = $gameSelectorTS.select();
-        this._subject.savePosition();
-        $gameParty.setupTS([this._subject.battler()]);
-        this._phase = 'playerSelect';
-    }
-};
 
 BattleManagerTS.updateSelect = function() {
     var x = $gameSelectorTS.x;
@@ -793,52 +788,6 @@ BattleManagerTS.selectIsValidForTarget = function(subject) {
     } else {
         return subject && subject.isActor();
     }
-};
-
-BattleManagerTS.endPlayerPhase = function() {
-    $gameSelectorTS.setTransparent(true);
-    $gameSelectorTS.savePosition();
-    $gameTroopTS.battlerMembers().forEach(function(enemy) {
-        enemy.onTurnEnd();
-        this._logWindow.displayAutoAffectedStatus(enemy);
-        this._logWindow.displayRegeneration(enemy);
-    }, this);
-    this._spriteset.startPhase(TacticsSystem.enemyPhaseTerm);
-    this._phase = 'startEnemy';
-};
-
-BattleManagerTS.startEnemyPhase = function() {
-    $gameSelectorTS.setTransparent(false);
-    this._subject = null;
-    if (this.isEnemyPhase()) {
-        this.updateEnemyPhase();
-    } else {
-        this.endEnemyPhase();
-    }
-};
-
-BattleManagerTS.isEnemyPhase = function() {
-    return $gameTroopTS.isPhase();
-};
-
-BattleManagerTS.updateEnemyPhase = function() {
-    this._subject = this.getNextEnemy();
-    this._subject.updateRange();
-    $gameTroop.setupTS([this.subject()]);
-    var pos = this._subject.makeMove();
-    $gameSelectorTS.performTransfer(pos.x, pos.y);  // scrollTo
-    this.subject().makeActions();
-    $gameMap.eraseTiles();
-    this._phase = 'move';
-};
-
-BattleManagerTS.endEnemyPhase = function() {
-    $gamePartyTS.battlerMembers().forEach(function(actor) {
-        actor.onTurnEnd();
-        this._logWindow.displayAutoAffectedStatus(actor);
-        this._logWindow.displayRegeneration(actor);
-    }, this);
-    this.startTurn();
 };
 
 BattleManagerTS.setupAction = function() {
@@ -945,22 +894,8 @@ BattleManagerTS.checkSubstitute = function(target) {
 BattleManagerTS.endBattlePhase = function() {
     this._subject.endAction();
     $gameMap.eraseTiles();
-    if (this._subject.isActor()) {
-        this._phase = 'startPlayer';
-    } else {
-        this._phase = 'startEnemy';
-    }
-};
+    this._phase = 'startPlayer';
 
-BattleManagerTS.refreshBlueCells = function() {
-    if ($gameSelectorTS.hadMoved()) {
-        $gameMap.eraseTiles();
-        var subject = $gameSelectorTS.select();
-        if (this.canShowBlueCells(subject)) {
-            $gameMap.setMoveColor();
-            subject.updateRange();
-        }
-    }
 };
 
 BattleManagerTS.setupLocalBattle = function(action) {
@@ -987,10 +922,8 @@ BattleManagerTS.processCancel = function() {
 BattleManagerTS.selectPreviousCommand = function() {
     SoundManager.playCancel();
     this._subject.restorePosition();
-    $gameSelectorTS.updateSelect();
-    this.refreshBlueCells();
-    this._subject = null;
-    this._phase = 'playerExplore'
+    this.updatePlayerPhase();
+    this._phase = 'playerSelect'
 };
 
 BattleManagerTS.checkBattleEnd = function() {
@@ -1222,6 +1155,10 @@ Game_SelectorTS.prototype.initMembers = function() {
     this._scrolledY = 0;
 };
 
+Game_SelectorTS.prototype.setSelect = function(subject) {
+    this._select = subject;
+};
+
 Game_SelectorTS.prototype.pos = function(x, y) {
     return this.x === x && this.y === y;
 };
@@ -1327,9 +1264,8 @@ Game_SelectorTS.prototype.executeMove = function(x, y, direction) {
 };
 
 Game_SelectorTS.prototype.performTransfer = function(x, y) {
-    this._realX = this._x = x;
-    this._realY = this._y = y;
-    $gameMap.setDisplayPos(x - this.centerX(), y - this.centerY());
+    this._x = x;
+    this._y = y;
     this.updateSelect();
 };
 
