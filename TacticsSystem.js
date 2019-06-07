@@ -3,8 +3,8 @@
 //=============================================================================
 
 /*:
- * @plugindesc A Tactical Battle System like Final Fantasy Tactics or Fire Emblem series.
- * @author El Moussaoui Bilal (https://twitter.com/belmouss_)
+ * @plugindesc A Tactical Battle System like Fire Emblem series.
+ * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
  *
  * @param cursor speed
  * @desc The cursor speed. 1: Slow, 2: Normal, 3: Fast
@@ -34,28 +34,45 @@
  * @desc The color to display the range of an action on an enemy.
  * @default #B22222
  *
+ * @param start cell color
+ * @desc The color to display the start cells.
+ * @default #FFD700
+ *
  * @param animationId of death
  * @desc The animation for the death of a unit.
  * @default 97
  *
+ * @param display manager
+ * @default
+ *
  * @param show hp gauge
+ * @parent display manager
  * @desc Show the hp gauge below the unit. 0: False, 1: True
  * @default 1
  *
  * @param show state icon
+ * @parent display manager
  * @desc Show the icon state of a unit. 0: False, 1: True
  * @default 1
  *
  * @param show phase sprite
+ * @parent display manager
  * @desc Show the phase sprite. 0: False, 1: True
  * @default 1
  *
  * @param duration phase sprite
+ * @parent display manager
  * @desc The duration to display the phase sprite.
  * @default 120
  *
  * @param show information window
+ * @parent display manager
  * @desc Show the information battle window.
+ * @default 1
+ *
+ * @param show turn count
+ * @parent display manager
+ * @desc Show the turn count.
  * @default 1
  *
  * @param text manager
@@ -86,6 +103,29 @@
  * @desc The critical rate abbrevation term.
  * @default Cri
  *
+ * @param turn term
+ * @parent text manager
+ * @desc The turn term.
+ * @default Turn
+ *
+ * @param event manager
+ * @default
+ *
+ * @param step anime
+ * @parent event manager
+ * @desc The stepping option of event.
+ * @default -1
+ *
+ * @param move speed
+ * @parent event manager
+ * @desc The movement speed of event.
+ * @default -1
+ *
+ * @param move frequency
+ * @parent event manager
+ * @desc The movement frequency of event.
+ * @default -1
+ *
  * @help
  *
  * For more information, please consult :
@@ -97,25 +137,34 @@
 var TacticsSystem = TacticsSystem || {};
 TacticsSystem.Parameters = PluginManager.parameters('TacticsSystem');
 
-TacticsSystem.cursorSpeed =           Number(TacticsSystem.Parameters['cursor speed']);
-TacticsSystem.gridOpacity =           Number(TacticsSystem.Parameters['grid opacity']);
-TacticsSystem.movePoints =            Number(TacticsSystem.Parameters['move points']);
-TacticsSystem.actionRange =           String(TacticsSystem.Parameters['action range']);
-TacticsSystem.moveScopeColor =        String(TacticsSystem.Parameters['move scope color']);
-TacticsSystem.allyScopeColor =        String(TacticsSystem.Parameters['ally scope color']);
-TacticsSystem.enemyScopeColor =       String(TacticsSystem.Parameters['enemy scope color']);
-TacticsSystem.animationIdOfDeath =    String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.animationIdOfDeath =    String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.animationIdOfDeath =    String(TacticsSystem.Parameters['animationId of death']);
-TacticsSystem.showHpGauge =           Number(TacticsSystem.Parameters['show hp gauge']);
-TacticsSystem.showStateIcon =         Number(TacticsSystem.Parameters['show state icon']);
-TacticsSystem.showPhaseSprite =       Number(TacticsSystem.Parameters['show phase sprite']);
-TacticsSystem.durationPhaseSprite =   Number(TacticsSystem.Parameters['duration phase sprite']);
-TacticsSystem.showInformationWindow = Number(TacticsSystem.Parameters['show information window']);
-TacticsSystem.damageTerm =            String(TacticsSystem.Parameters['damage term (abbr.)']);
-TacticsSystem.hitRateTerm =           String(TacticsSystem.Parameters['hit rate term (abbr.)']);
-TacticsSystem.criticalRateTerm =      String(TacticsSystem.Parameters['critical rate term (abbr.)']);
-//show turn
+TacticsSystem.cursorSpeed =            Number(TacticsSystem.Parameters['cursor speed']);
+TacticsSystem.gridOpacity =            Number(TacticsSystem.Parameters['grid opacity']);
+TacticsSystem.movePoints =             Number(TacticsSystem.Parameters['move points']);
+TacticsSystem.actionRange =            String(TacticsSystem.Parameters['action range']);
+TacticsSystem.moveScopeColor =         String(TacticsSystem.Parameters['move scope color']);
+TacticsSystem.allyScopeColor =         String(TacticsSystem.Parameters['ally scope color']);
+TacticsSystem.enemyScopeColor =        String(TacticsSystem.Parameters['enemy scope color']);
+TacticsSystem.startCellColor =         String(TacticsSystem.Parameters['start cell color']);
+TacticsSystem.animationIdOfDeath =     String(TacticsSystem.Parameters['animationId of death']);
+TacticsSystem.showHpGauge =            Number(TacticsSystem.Parameters['show hp gauge']);
+TacticsSystem.showStateIcon =          Number(TacticsSystem.Parameters['show state icon']);
+TacticsSystem.showPhaseSprite =        Number(TacticsSystem.Parameters['show phase sprite']);
+TacticsSystem.durationPhaseSprite =    Number(TacticsSystem.Parameters['duration phase sprite']);
+TacticsSystem.showInformationWindow =  Number(TacticsSystem.Parameters['show information window']);
+TacticsSystem.playerPhaseTerm =        String(TacticsSystem.Parameters['player phase term']);
+TacticsSystem.enemyPhaseTerm =         String(TacticsSystem.Parameters['enemy phase term']);
+TacticsSystem.damageTerm =             String(TacticsSystem.Parameters['damage term (abbr.)']);
+TacticsSystem.hitRateTerm =            String(TacticsSystem.Parameters['hit rate term (abbr.)']);
+TacticsSystem.criticalRateTerm =       String(TacticsSystem.Parameters['critical rate term (abbr.)']);
+TacticsSystem.turnTerm =               String(TacticsSystem.Parameters['turn term']);
+TacticsSystem.stepAnime =              Number(TacticsSystem.Parameters['step anime']);
+TacticsSystem.moveSpeed =              Number(TacticsSystem.Parameters['move speed']);
+TacticsSystem.moveFrequency =          Number(TacticsSystem.Parameters['move frequency']);
+TacticsSystem.showTurnCount =          Number(TacticsSystem.Parameters['show turn count']);
+TacticsSystem.animationIdOfAppear =    Number(TacticsSystem.Parameters['animationId of appear']);
+//TacticsSystem.startBattleSwitchId =    Number(TacticsSystem.Parameters['start battle switch id']);
+//TacticsSystem.turnCountVarId =         Number(TacticsSystem.Parameters['turn count var id']);
+//TacticsSystem.enemiesRemainingVarId =  Number(TacticsSystem.Parameters['enemies remaining var id']);
 
 //-----------------------------------------------------------------------------
 // Scene_BattleTS
@@ -162,6 +211,7 @@ Scene_BattleTS.prototype.createAllWindows = function() {
     this.createLogWindow();
     this.createStatusWindow();
     this.createActorCommandWindow();
+    this.createStatusPartyWindow();
     this.createHelpWindow();
     this.createSkillWindow();
     this.createItemWindow();
@@ -192,6 +242,13 @@ Scene_BattleTS.prototype.createActorCommandWindow = function() {
     this._actorCommandWindow.setHandler('action', this.commandAction.bind(this));
     this._actorCommandWindow.setHandler('cancel', this.selectPreviousCommand.bind(this));
     this.addWindow(this._actorCommandWindow);
+};
+
+Scene_BattleTS.prototype.createStatusPartyWindow = function() {
+    this._statusPartyWindow = new Window_MenuStatus(0, 0);
+    this._statusPartyWindow.reserveFaceImages();
+    this.addWindow(this._statusPartyWindow);
+    this._statusPartyWindow.hide();
 };
 
 Scene_BattleTS.prototype.createHelpWindow = function() {
@@ -238,6 +295,7 @@ Scene_BattleTS.prototype.createInformationWindow = function() {
 
 Scene_BattleTS.prototype.start = function() {
     Scene_Base.prototype.start.call(this);
+    this._statusPartyWindow.refresh();
     BattleManagerTS.startBattle();
 };
 
@@ -278,8 +336,12 @@ Scene_BattleTS.prototype.processMapTouch = function() {
 
 Scene_BattleTS.prototype.updateBattleProcess = function() {
     if (!this.isAnyInputWindowActive() || BattleManagerTS.isBattleEnd()) {
-        if (BattleManagerTS.isInputting()) {
-            this.startActorCommandSelection();
+        if (BattleManagerTS.isInputting() && !$gameMap.isEventRunning()) {
+            if (BattleManagerTS.turnCount() > 0) {
+                this.startActorCommandSelection();
+            } else {
+                this.startStatusParty();
+            }
         }
         BattleManagerTS.update();
     }
@@ -307,13 +369,19 @@ Scene_BattleTS.prototype.updateTargetStatusWindow = function() {
     var select = $gameSelectorTS.select();
     if (this.canShowStatusWindow(select) && BattleManagerTS.isTargetSelection()) {
         this._statusTargetWindow.open(select);
-        if (BattleManagerTS.canSelectTarget(select) && TacticsSystem.showInformationWindow) {
-            this._informationWindow.open(select);
-        } else {
-            this._informationWindow.close();
-        }
+        this.updateInformationWindow();
     } else {
         this._statusTargetWindow.close();
+        this._informationWindow.close();
+    }
+};
+
+Scene_BattleTS.prototype.updateInformationWindow = function() {
+    var select = $gameSelectorTS.select();
+    if (BattleManagerTS.canSelectTarget(select) && TacticsSystem.showInformationWindow) {
+        BattleManagerTS.turnTowardCharacter(select);
+        this._informationWindow.open(select);
+    } else {
         this._informationWindow.close();
     }
 };
@@ -327,6 +395,12 @@ Scene_BattleTS.prototype.isAnyInputWindowActive = function() {
 Scene_BattleTS.prototype.startActorCommandSelection = function() {
     this._statusSubjectWindow.show();
     this._actorCommandWindow.setup(BattleManagerTS.subject());
+};
+
+Scene_BattleTS.prototype.startStatusParty = function() {
+    this._statusPartyWindow.show();
+    this._statusPartyWindow.open();
+    this._statusPartyWindow.activate();
 };
 
 Scene_BattleTS.prototype.commandAttack = function() {
@@ -371,6 +445,7 @@ Scene_BattleTS.prototype.selectPreviousCommand = function() {
 Scene_BattleTS.prototype.onEventOk = function() {
     var subject = BattleManagerTS.subjectTS();
     var event = subject.actions()[this._actorCommandWindow.index()];
+    BattleManagerTS.turnTowardCharacter(event);
     event.start();
     BattleManagerTS.startEvent();
     this._actorCommandWindow.close();
@@ -465,9 +540,13 @@ BattleManagerTS.setup = function() {
     var x = $gamePlayer.x;
     var y = $gamePlayer.y;
     $gameSelectorTS.setPosition(x, y);
+    this.setupEvents();
+    this.setSwitch();
+    this.setVariables();
 };
 
 BattleManagerTS.initMembers = function() {
+    this._starting = true;
     this._phase = 'preparation';
     this._canLose = false;
     this._logWindow = null;
@@ -482,49 +561,47 @@ BattleManagerTS.initMembers = function() {
     this._isBattleEnd = false;
     this._turn = 0;
     this._actionBattlers = [];
+    this._pendingIndex = -1;
+    this._target = null;
 };
 
 BattleManagerTS.createGameObjects = function() {
-    var actors = [];
-    var enemies = [];
     for (var i = 0; i < $gameMap.events().length; i++) {
         var event = $gameMap.events()[i];
-        var meta = event.meta();
-        if (parseInt(meta['actor']) > 0) {
-            this.createGameActors1(actors, event);
-        } else if (parseInt(meta['enemy']) > 0) {
-            this.createGameEnemies(enemies, event);
-        } else if (parseInt(meta['party']) >= 0) {
-            this.createGameActors2(actors, event)
-        }
+        DataManager.extractInfoEvent(event);
     }
-    this.setupGameObjectsTS(actors, enemies);
 };
 
-BattleManagerTS.setupGameObjectsTS = function(actors, enemies) {
-    $gamePartyTS.setup(actors);
-    $gameTroopTS.setup(enemies);
+BattleManagerTS.setupEvents = function() {
+    if (TacticsSystem.stepAnime > -1) {
+        $gamePartyTS.setStepAnime(TacticsSystem.stepAnime);
+        $gameTroopTS.setStepAnime(TacticsSystem.stepAnime);
+    }
+    if (TacticsSystem.moveSpeed > -1) {
+        $gamePartyTS.setMoveSpeed(TacticsSystem.moveSpeed);
+        $gameTroopTS.setMoveSpeed(TacticsSystem.moveSpeed);
+    }
+    if (TacticsSystem.moveFrequency > -1) {
+        $gamePartyTS.setMoveFrequency(TacticsSystem.moveFrequency);
+        $gameTroopTS.setMoveFrequency(TacticsSystem.moveFrequency);
+    }
 };
 
-BattleManagerTS.createGameActors1 = function(actors, event) {
-    var actorId = parseInt(event.meta()['actor']);
-    actors.push(new Game_ActorTS(event, actorId));
+BattleManagerTS.setSwitch = function() {
+    if (TacticsSystem.startBattleSwitchId > -1) {
+        $gameSwitch.setValue(TacticsSystem.startBattleSwitchId, this._starting);
+    }
 };
 
-BattleManagerTS.createGameActors2 = function(actors, event) {
-    var partyId = parseInt(event.meta()['party']);
-    var actor = $gameParty.members()[partyId]
-    actors.push(new Game_ActorTS(event, actor.actorId()));
-};
-
-BattleManagerTS.createGameEnemies = function(enemies, event) {
-    var enemyId = parseInt(event.meta()['enemy']);
-    enemies.push(new Game_EnemyTS(event, enemyId));
+BattleManagerTS.setVariables = function() {
+    if (TacticsSystem.turnCountVarId > -1) {
+        $gameVariables.setValue(TacticsSystem.turnCountVarId, this._turn);
+    }
 };
 
 BattleManagerTS.startBattle = function() {
     $gamePlayer.setThrough(true);
-    this._spriteset.createGrid()
+    this._spriteset.createGrid();
 };
 
 BattleManagerTS.setLogWindow = function(logWindow) {
@@ -536,11 +613,11 @@ BattleManagerTS.setSpriteset = function(spriteset) {
 };
 
 BattleManagerTS.subjectTS = function() {
-    return this._subject;  // use index
+    return this._subject;
 };
 
 BattleManagerTS.subject = function() {
-    return this._subject.battler();  // use index
+    return this._subject.battler();
 };
 
 BattleManagerTS.active = function() {
@@ -565,11 +642,17 @@ BattleManagerTS.update = function() {
         case 'startPlayer':
             this.startPlayerPhase();
             break;
+        case 'playerExplore':
+            this.updateExplore();
+            break;
         case 'playerSelect':
             this.updateSelect();
             break;
         case 'playerTarget':
             this.updateTarget();
+            break;
+        case 'startEnemy':
+            this.startEnemyPhase();
             break;
         case 'move':
             this.updateMove();
@@ -620,7 +703,36 @@ BattleManagerTS.updateEventMain = function() {
 };
 
 BattleManagerTS.preparation = function() {
-    this.startTurn();
+    this.refreshBlueCells();
+    var x = $gameSelectorTS.x;
+    var y = $gameSelectorTS.y;
+    var tile = $gameMap.tile(x, y);
+    if (this.canSelectCell(tile)) {
+        this._phase = 'input';
+        SoundManager.playOk();
+        var index = $gameMap.startTiles().indexOf(tile);
+        if (this._pendingIndex >= 0) {
+            this._pendingIndex = -1;
+
+        } else {
+            this._pendingIndex = index;
+        }
+    }
+    if ($gameMap.startTiles().length === 0) {
+        this.startTurn();
+    }
+    if (Input.isTriggered('menu')) {
+        $gameMap.eraseStartTiles();
+        this.startTurn();
+    }
+};
+
+BattleManagerTS.canSelectCell = function(tile) {
+    return this.isTriggered() && $gameMap.startTiles().contains(tile);
+};
+
+BattleManagerTS.selectIsValidForSelection = function(actor) {
+    return actor && actor.isActor() && actor.canPlay();
 };
 
 BattleManagerTS.startTurn = function() {
@@ -628,75 +740,130 @@ BattleManagerTS.startTurn = function() {
     $gameTroop.increaseTurn();
     $gameTroopTS.onTurnStart();
     $gamePartyTS.onTurnStart();
+    $gameSelectorTS.setTransparent(true);
+    $gameSelectorTS.restorePosition();
     this._logWindow.startTurn();
-    this.makeActionOrders();
+    this.makePlayerOrders();
+    this._spriteset.startPhase(TacticsSystem.playerPhaseTerm);
     this._phase = 'startPlayer';
+    this.setSwitch();
+    this.setVariables();
 };
 
-BattleManagerTS.makeActionOrders = function() {
-    var battlers = [];
-    if (!this._surprise) {
-        battlers = battlers.concat($gamePartyTS.members());
-    }
-    if (!this._preemptive) {
-        battlers = battlers.concat($gameTroopTS.members());
-    }
-    battlers.forEach(function(battler) {
-        battler.battler().makeSpeed();
-    });
-    battlers.sort(function(a, b) {
-        return b.battler().speed() - a.battler().speed();
-    });
-    this._actionBattlers = battlers;
+BattleManagerTS.updateBattlers = function() {
+    $gamePartyTS.updateActive();
+    $gameTroopTS.updateActive();
 };
 
-BattleManagerTS.getNextSubject = function() {
-    for (;;) {
-        var battler = this._actionBattlers.shift();
-        if (!battler) {
-            return null;
-        }
-        if (battler.isAlive()) {
-            return battler;
-        }
-    }
+BattleManagerTS.makePlayerOrders = function() {
+    var battlers = $gamePartyTS.restrictedMembers();
+    this._playersOrder = battlers;
+};
+
+BattleManagerTS.getNextPlayer = function() {
+    return this._playersOrder.shift();
+};
+
+BattleManagerTS.makeEnemyOrders = function() {
+    var battlers = $gameTroopTS.aliveMembers();
+    this._enemiesOrder = battlers;
+};
+
+BattleManagerTS.getNextEnemy = function() {
+    return this._enemiesOrder.shift();
 };
 
 BattleManagerTS.startPlayerPhase = function() {
-    this._subject = this.getNextSubject();
-    $gameSelectorTS.setSelect(this._subject);
+    this.setVariables();
+    this.updateBattlers();
+    $gameSelectorTS.setTransparent(false);
+    this._subject = this.getNextPlayer();
     if (this._subject) {
-        if (this._subject.isActor()) {
-            this.updatePlayerPhase();
-        } else {
-            this.updateEnemyPhase();
-        }
+        this.updatePlayerPhase();
+    } else if (this.isPlayerPhase()) {
+        this.refreshBlueCells();
+        this._phase = 'playerExplore';
     } else {
-        this.startTurn();
+        this.endPlayerPhase();
     }
 };
 
 BattleManagerTS.updatePlayerPhase = function() {
     this._subject.updateRange();
-    this._subject.savePosition();
-    $gameMap.setMoveColor();
     $gameParty.setupTS([this._subject.battler()]);
     var pos = this._subject.makeMove();
     $gameSelectorTS.performTransfer(pos.x, pos.y);
     this.subject().makeActions();
-    this._phase = 'playerSelect';
-};
-
-BattleManagerTS.updateEnemyPhase = function() {
-    this._subject.updateRange();
-    $gameTroop.setupTS([this.subject()]);
-    var pos = this._subject.makeMove();
-    $gameSelectorTS.performTransfer(pos.x, pos.y);  // scrollTo
-    this.subject().makeActions();
-    $gameMap.eraseTiles();
     this._phase = 'move';
 };
 
+BattleManagerTS.isPlayerPhase = function() {
+    return $gamePartyTS.isPhase();
+};
+
+BattleManagerTS.updateExplore = function() {
+    this.refreshBlueCells();
+    if (this.canSelectActor($gameSelectorTS.select())) {
+        SoundManager.playOk();
+        this._subject = $gameSelectorTS.select();
+        this._subject.savePosition();
+        $gameParty.setupTS([this._subject.battler()]);
+        this._phase = 'playerSelect';
+    }
+};
+
+BattleManagerTS.isStartPhase = function() {
+    return this._phase === 'startPlayer' || this._phase === 'startEnemy';
+};
+
+BattleManagerTS.isTargetSelection = function() {
+    return this._phase === 'playerTarget';
+};
+
+BattleManagerTS.endPlayerPhase = function() {
+    $gameSelectorTS.setTransparent(true);
+    $gameSelectorTS.savePosition();
+    $gameTroopTS.battlerMembers().forEach(function(enemy) {
+        enemy.onTurnEnd();
+        this._logWindow.displayAutoAffectedStatus(enemy);
+        this._logWindow.displayRegeneration(enemy);
+    }, this);
+    this._spriteset.startPhase(TacticsSystem.enemyPhaseTerm);
+    this._phase = 'startEnemy';
+    this.updateBattlers();
+    this.makeEnemyOrders();
+};
+
+BattleManagerTS.startEnemyPhase = function() {
+    $gameSelectorTS.setTransparent(false);
+    this._subject = null;
+    if (this.isEnemyPhase()) {
+        this.updateEnemyPhase();
+    } else {
+        this.endEnemyPhase();
+    }
+};
+
+BattleManagerTS.isEnemyPhase = function() {
+    return $gameTroopTS.isPhase();
+};
+
+BattleManagerTS.updateEnemyPhase = function() {
+    this._subject = this.getNextEnemy();
+    var x = this._subject.x;
+    var y = this._subject.y;
+    this._subject.updateRange();
+    $gameTroop.setupTS([this.subject()]);
+    var pos = this._subject.makeMove();
+    this.subject().makeActions();
+    $gameMap.eraseTiles();
+    if (x !== pos.x || y !== pos.y) {
+        $gameSelectorTS.performTransfer(pos.x, pos.y);
+        this._phase = 'move';
+    } else {
+        this.setupAction();
+    }
+};
 
 BattleManagerTS.updateSelect = function() {
     var x = $gameSelectorTS.x;
@@ -720,6 +887,7 @@ BattleManagerTS.updateMove = function() {
     this._subject.moveStraightTo(x, y);
     if (this._subject.pos(x, y) && !this._subject.isMoving()) {
         if (this.subject().isActor() && !this.subject().isRestricted()) {
+            this._subject.checkEventTriggerTouch();
             this._phase = 'input';
         } else {
             this.setupAction();
@@ -772,6 +940,7 @@ BattleManagerTS.playerTargetCancel = function() {
 };
 
 BattleManagerTS.onTargetOk = function(target) {
+    this._target = target;
     var action = BattleManagerTS.inputtingAction();
     action.setTarget(target.battler().index());
     BattleManagerTS.setupAction();
@@ -805,6 +974,8 @@ BattleManagerTS.processAction = function() {
         action.prepare();
         if (action.isValid()) {
             this.startAction();
+        } else {
+            this._subject.endAction();
         }
         subject.removeCurrentAction();
     } else {
@@ -832,8 +1003,9 @@ BattleManagerTS.updateAction = function() {
     var target = this._targets.shift();
     if (target) {
         var friendsUnitTS = target.friendsUnitTS();
-        var battler = friendsUnitTS.getBattlerTS(target);
-        $gameSelectorTS.performTransfer(battler.x, battler.y);
+        this._target = friendsUnitTS.getBattlerTS(target);
+        $gameSelectorTS.performTransfer(this._target.x, this._target.y);
+        this.turnTowardCharacter(this._target);
         this.invokeAction(this.subject(), target);
     } else {
         this._logWindow.endAction(this.subject());
@@ -891,11 +1063,35 @@ BattleManagerTS.checkSubstitute = function(target) {
     return target.isDying() && !this._action.isCertainHit();
 };
 
+BattleManagerTS.endEnemyPhase = function() {
+    $gamePartyTS.battlerMembers().forEach(function(actor) {
+        actor.onTurnEnd();
+        this._logWindow.displayAutoAffectedStatus(actor);
+        this._logWindow.displayRegeneration(actor);
+    }, this);
+    this.startTurn();
+};
+
 BattleManagerTS.endBattlePhase = function() {
+    this._target = null;
     this._subject.endAction();
     $gameMap.eraseTiles();
-    this._phase = 'startPlayer';
+    if (this._subject.isActor()) {
+        this._phase = 'startPlayer';
+    } else {
+        this._phase = 'startEnemy';
+    }
+};
 
+BattleManagerTS.refreshBlueCells = function() {
+    if ($gameSelectorTS.hadMoved()) {
+        $gameMap.eraseTiles();
+        var subject = $gameSelectorTS.select();
+        if (this.canShowBlueCells(subject)) {
+            $gameMap.setMoveColor();
+            subject.updateRange();
+        }
+    }
 };
 
 BattleManagerTS.setupLocalBattle = function(action) {
@@ -922,8 +1118,10 @@ BattleManagerTS.processCancel = function() {
 BattleManagerTS.selectPreviousCommand = function() {
     SoundManager.playCancel();
     this._subject.restorePosition();
-    this.updatePlayerPhase();
-    this._phase = 'playerSelect'
+    $gameSelectorTS.updateSelect();
+    this.refreshBlueCells();
+    this._subject = null;
+    this._phase = 'playerExplore'
 };
 
 BattleManagerTS.checkBattleEnd = function() {
@@ -1108,6 +1306,9 @@ BattleManagerTS.selectIsValidForMove = function(subject) {
 };
 
 BattleManagerTS.terminate = function() {
+    this._starting = false;
+    this.setSwitch();
+    this.setVariables();
     $gamePlayer.setThrough(false);
     $gameTemp.clearPosition();
 };
@@ -1118,6 +1319,14 @@ BattleManagerTS.startEvent = function() {
 
 BattleManagerTS.playerTargetSelection = function() {
     this._phase = 'playerTarget'
+};
+
+BattleManagerTS.turnTowardCharacter = function(character) {
+    this._subject.turnTowardCharacter(character)
+};
+
+BattleManagerTS.turnCount = function() {
+    return this._turn;
 };
 
 //-----------------------------------------------------------------------------
@@ -1264,8 +1473,9 @@ Game_SelectorTS.prototype.executeMove = function(x, y, direction) {
 };
 
 Game_SelectorTS.prototype.performTransfer = function(x, y) {
-    this._x = x;
-    this._y = y;
+    this._x = this._realX = x;
+    this._y = this._realY = y;
+    $gameMap.performScroll(x, y);
     this.updateSelect();
 };
 
@@ -1386,6 +1596,10 @@ Game_SelectorTS.prototype.isTransparent = function() {
     return this._transparent;
 };
 
+Game_SelectorTS.prototype.isBusy = function() {
+    return this._realX !== this._x || this._realY !== this._y;
+};
+
 //-----------------------------------------------------------------------------
 // Game_BattlerTS
 //
@@ -1408,6 +1622,7 @@ Game_BattlerTS.prototype.initialize = function(event) {
     this._x = event.x;
     this._y = event.y;
     this._event = event;
+    this.updateActive();
 };
 
 Game_BattlerTS.prototype.initMembers = function() {
@@ -1417,6 +1632,8 @@ Game_BattlerTS.prototype.initMembers = function() {
     this._move = 0;
     this._movePath = [];
     this._hasPlayed = false;
+    this._active = true;
+    this._requestImage = false;
 };
 
 Game_BattlerTS.prototype.pos = function(x, y) {
@@ -1429,6 +1646,22 @@ Game_BattlerTS.prototype.event = function(x, y) {
 
 Game_BattlerTS.prototype.battler = function(x, y) {
     return null;
+};
+
+Game_BattlerTS.prototype.active = function(active) {
+    this._active = active;
+};
+
+Game_BattlerTS.prototype.isActive = function() {
+    return this._active;
+};
+
+Game_BattlerTS.prototype.requestImage = function() {
+    return this._requestImage;
+};
+
+Game_BattlerTS.prototype.updateActive = function() {
+    this.active(this._event.isActive());
 };
 
 Game_BattlerTS.prototype.setMove = function(object) {
@@ -1471,12 +1704,17 @@ Game_BattlerTS.prototype.refreshState = function() {
     }
 };
 
+Game_BattlerTS.prototype.activeEffect = function() {
+    var animationIdOfDeath = 97 || -1;
+    this._event.requestAnimation(animationIdOfDeath);
+};
+
 Game_BattlerTS.prototype.isMoving = function() {
     return this._event.isMoving();
 };
 
 Game_BattlerTS.prototype.isActor = function() {
-    return this.battler().isActor();
+    return this.event().isActorTS();
 };
 
 Game_BattlerTS.prototype.isAlive = function() {
@@ -1520,9 +1758,6 @@ Game_BattlerTS.prototype.isItemRangeOk = function(item) {
 };
 
 Game_BattlerTS.prototype.makeMove = function() {
-    //if (this.isAutoBattle()) {
-    //    this.makeAutoBattleMove();
-    //}
     if (this.battler().isConfused()) {
         return this.makeConfusionMove();
     }
@@ -1559,6 +1794,32 @@ Game_BattlerTS.prototype.isConfusedRangeOk = function(action) {
     default:
         return action.battleFriendsUnit(this).length > 1;
     }
+};
+
+Game_BattlerTS.prototype.turnTowardCharacter = function(character) {
+    this._event.turnTowardCharacter(character)
+};
+
+Game_BattlerTS.prototype.updateImage = function() {
+     if (!this.isActive()) {
+        this._requestImage = true;
+    } else {
+        this.setImage();
+    }
+};
+
+Game_BattlerTS.prototype.setImage = function() {
+    var characterName = this._actor ? this._actor.characterName() : '';
+    var characterIndex = this._actor ? this._actor.characterIndex() : 0;
+    this._event.setImage(characterName, characterIndex);
+};
+
+Game_BattlerTS.prototype.isPosFound = function(x, y, pos, target) {
+    return !$gameMap.isOnTiles(x, y) || this.isOnTarget(pos, target);
+};
+
+Game_BattlerTS.prototype.isOnTarget = function(pos, target) {
+    return pos.x === target.x && pos.y === target.y;
 };
 
 //-----------------------------------------------------------------------------
@@ -1622,8 +1883,28 @@ Game_ActorTS.prototype.checkEventsTriggerHere = function(x, y) {
         var events = $gameMap.eventsXy(x, y);
         for (var i = 0; i < events.length; i++) {
             var event = events[i];
-            if (event.isTriggerIn([0]) && event.isNormalPriority() === true) {
+            if (event.isTriggerIn([0])) {
                 this._actions.push(event);
+            }
+        }
+    }
+};
+
+Game_ActorTS.prototype.checkEventTriggerTouch = function() {
+    for (var i = 0; i < $gameMap.events().length; i++) {
+        var event = $gameMap.events()[i];
+        var x = event.x;
+        var y = event.y;
+        if (event.isActive() && event.meta()['trigger']) {
+            var d = event.meta()['trigger'];
+            for (var j = x - d; j <= x + d; j++) {
+                for (var k = y - d; k <= y + d; k++) {
+                    if (Math.abs(j - x) + Math.abs(k - y) <= d) {
+                        if (this.pos(j, k)) {
+                            event.start();
+                        }
+                    }
+                }
             }
         }
     }
@@ -1693,6 +1974,31 @@ Game_EnemyTS.prototype.makeMove = function() {
     }
 };
 
+Game_EnemyTS.prototype.findTarget = function() {
+    var rate = 0;
+    var x = this.x;
+    var y = this.y;
+    var target = new Point(this.x, this.y);
+    for (var i = 0; i < $gameMap.tiles().length; i++) {
+        var tile = $gameMap.tiles()[i];
+        this._x = $gameMap.positionTileX(tile);
+        this._y = $gameMap.positionTileY(tile);
+        var actionList = this.battler().enemy().actions.filter(function(a) {
+            return this.battler().isActionValid(a);
+        }, this);
+        var sum = actionList.reduce(function(r, a) {
+            return r + a.rating * 3;
+        }, 0);
+        if (sum > rate) {
+            rate = sum;
+            target = new Point(this.x, this.y);
+        }
+    }
+    this._x = x;
+    this._y = y;
+    return target;
+};
+
 Game_EnemyTS.prototype.findBestMove = function() {
     this._event.tilesRange(this._aggro);
     var target = this.findTarget();
@@ -1707,39 +2013,6 @@ Game_EnemyTS.prototype.findBestMove = function() {
     this._x = pos.x;
     this._y = pos.y;
     return pos;
-};
-
-Game_EnemyTS.prototype.findTarget = function() {
-    var rate = 0;
-    var x = this.x;
-    var y = this.y;
-    var target = new Point(this.x, this.y);
-    for (var i = 0; i < $gameMap.tiles().length; i++) {
-        var tile = $gameMap.tiles()[i];
-        this._x = $gameMap.positionTileX(tile);
-        this._y = $gameMap.positionTileY(tile);
-        var actionList = this.battler().enemy().actions.filter(function(a) {
-            return this.battler().isActionValid(a);
-        }, this);
-        var sum = actionList.reduce(function(r, a) {
-            return r + a.rating * 3;  // * 3 !
-        }, 0);
-        if (sum > rate) {
-            rate = sum;
-            target = new Point(this.x, this.y);
-        }
-    }
-    this._x = x;
-    this._y = y;
-    return target;
-};
-
-Game_EnemyTS.prototype.isPosFound = function(x, y, pos, target) {
-    return !$gameMap.isOnTiles(x, y) || this.isOnTarget(pos, target);
-};
-
-Game_EnemyTS.prototype.isOnTarget = function(pos, target) {
-    return pos.x === target.x && pos.y === target.y;
 };
 
 //-----------------------------------------------------------------------------
@@ -1764,6 +2037,18 @@ Game_UnitTS.prototype.battlerMembers = function() {
     });
 };
 
+Game_UnitTS.prototype.activeMembers = function() {
+    return this.members().filter(function(member) {
+        return member.isActive();
+    });
+};
+
+Game_UnitTS.prototype.updateActive = function() {
+    this.members().forEach(function(member) {
+        member.updateActive();
+    });
+};
+
 Game_UnitTS.prototype.eventMembers = function() {
     return this.members().map(function(member) {
         return member.event();
@@ -1771,7 +2056,7 @@ Game_UnitTS.prototype.eventMembers = function() {
 };
 
 Game_UnitTS.prototype.aliveMembers = function() {
-    return this.members().filter(function(member) {
+    return this.activeMembers().filter(function(member) {
         return member.isAlive();
     });
 };
@@ -1810,8 +2095,26 @@ Game_UnitTS.prototype.getBattlerTS = function(object) {
 };
 
 Game_UnitTS.prototype.refreshState = function() {
-    this.members().forEach(function(member) {
+    this.activeMembers().forEach(function(member) {
         member.refreshState();
+    });
+};
+
+Game_UnitTS.prototype.setStepAnime = function(stepAnime) {
+    this.members().forEach(function(member) {
+        member.event().setStepAnime(stepAnime);
+    });
+};
+
+Game_UnitTS.prototype.setMoveSpeed = function(moveSpeed) {
+    this.members().forEach(function(member) {
+        member.event().setMoveSpeed(moveSpeed);
+    });
+};
+
+Game_UnitTS.prototype.setMoveFrequency = function(moveFrequency) {
+    this.members().forEach(function(member) {
+        member.event().setMoveFrequency(moveFrequency);
     });
 };
 
@@ -1841,6 +2144,12 @@ Game_PartyTS.prototype.setup = function(actors) {
     this._inBattleTS = true;
 };
 
+Game_PartyTS.prototype.addActorTS = function(actor) {
+    this._actors.push(actor);
+    this._maxBattleMembers = this._actors.length;
+    this._inBattleTS = true;
+};
+
 Game_PartyTS.prototype.inBattleTS = function() {
     return this._inBattleTS;
 };
@@ -1850,7 +2159,7 @@ Game_PartyTS.prototype.members = function() {
 };
 
 Game_PartyTS.prototype.battleMembers = function() {
-    return $gameParty.members().map(function(member) {
+    return $gameParty.activeMembers().map(function(member) {
         return this.getBattlerTS(member);
     }, this);
 };
@@ -1860,7 +2169,7 @@ Game_PartyTS.prototype.maxBattleMembers = function() {
 };
 
 Game_PartyTS.prototype.restrictedMembers = function() {
-    return this.members().filter(function(member) {
+    return this.activeMembers().filter(function(member) {
         return member.battler().isRestricted() && member.isAlive();
     }, this);
 };
@@ -1879,10 +2188,15 @@ Game_TroopTS.prototype.constructor = Game_TroopTS;
 
 Game_TroopTS.prototype.initialize = function() {
     Game_UnitTS.prototype.initialize.call(this);
+    this._enemies = [];
 };
 
 Game_TroopTS.prototype.setup = function(enemies) {
     this._enemies = enemies;
+};
+
+Game_TroopTS.prototype.addEnemyTS = function(enemy) {
+    this._enemies.push(enemy);
 };
 
 Game_TroopTS.prototype.members = function() {
@@ -1890,7 +2204,7 @@ Game_TroopTS.prototype.members = function() {
 };
 
 Game_TroopTS.prototype.battleMembers = function() {
-    return $gameTroop.members().map(function(member) {
+    return $gameTroop.activeMembers().map(function(member) {
         return this.getBattlerTS(member);
     }, this);
 };
@@ -2323,46 +2637,72 @@ Spriteset_MapTS.prototype.initialize = function() {
 
 Spriteset_MapTS.prototype.createLowerLayer = function() {
     Spriteset_Map.prototype.createLowerLayer.call(this);
-    this.createTiles();
+    this.createBaseTiles();
 };
 
-Spriteset_MapTS.prototype.createTiles = function() {
+Spriteset_MapTS.prototype.createUpperLayer = function() {
+    Spriteset_Map.prototype.createUpperLayer.call(this);
+    if (TacticsSystem.showTurnCount) {
+        this.createTurn();
+    }
+};
+
+Spriteset_MapTS.prototype.createBaseTiles = function() {
     this._tilesSprite = new Sprite_Base();
-    var width = $gameMap.width();
-    var height = $gameMap.height();
-    this._tilesSprite.bitmap = new Bitmap(width * 48, height * 48);
     this._tilesSprite.z = 1;
-    this._tilesSprite.opacity = 120;
-    this._tilesSprite.color = TacticsSystem.moveScopeColor || '#0066CC';
-    this.loadTiles();
+    this._rangeTilesSprite = this.createTiles(TacticsSystem.moveScopeColor);
+    this._startTilesSprite = this.createTiles(TacticsSystem.startCellColor);
+    this._startTilesSprite.opacity = 180;
+    this.loadStartTiles();
     this._tilemap.addChild(this._tilesSprite);
 };
 
-Spriteset_MapTS.prototype.updateTiles = function() {
-    if (this._tiles !== $gameMap.tiles()) {
-        this.loadTiles();
-    }
-    var screen = $gameScreen;
-    var scale = screen.zoomScale();
-    this._tilesSprite.x = scale;
-    this._tilesSprite.y = scale;
-    this._tilesSprite.x = Math.round($gameMap.adjustX(0) * 48);
-    this._tilesSprite.y = Math.round($gameMap.adjustY(0) * 48);
-    this._tilesSprite.x += Math.round(screen.shake());
-};
-
-Spriteset_MapTS.prototype.loadTiles = function() {
-    this._tiles = $gameMap.tiles();
+Spriteset_MapTS.prototype.createTiles = function(color) {
+    var tilesSprite = new Sprite_Base();
     var width = $gameMap.width();
     var height = $gameMap.height();
-    this._tilesSprite.bitmap.clearRect(0, 0, width * 48, height * 48);
-    this._tilesSprite.color = $gameMap.color();
-    this._tiles.forEach(function(tile) {
+    tilesSprite.bitmap = new Bitmap(width * 48, height * 48);
+    tilesSprite.opacity = 120;
+    tilesSprite.color = color;
+    this._tilesSprite.addChild(tilesSprite);
+    return tilesSprite
+};
+
+Spriteset_MapTS.prototype.loadStartTiles = function() {
+    $gameMap.startTiles().forEach(function(tile) {
         var x = $gameMap.positionTileX(tile) * 48;
         var y = $gameMap.positionTileY(tile) * 48;
-        var color = this._tilesSprite.color;
-        this._tilesSprite.bitmap.fillRect(x + 2, y + 2, 44, 44, color);
+        var color = this._startTilesSprite.color;
+        this._startTilesSprite.bitmap.fillRect(x + 2, y + 2, 44, 44, color);
     }, this);
+};
+
+Spriteset_MapTS.prototype.updateRangeTiles = function() {
+    this._rangeTiles = $gameMap.tiles();
+    var width = $gameMap.width();
+    var height = $gameMap.height();
+    this._rangeTilesSprite.bitmap.clearRect(0, 0, width * 48, height * 48);
+    this._rangeTilesSprite.color = $gameMap.color();
+    this._rangeTiles.forEach(function(tile) {
+        var x = $gameMap.positionTileX(tile) * 48;
+        var y = $gameMap.positionTileY(tile) * 48;
+        var color = this._rangeTilesSprite.color;
+        this._rangeTilesSprite.bitmap.fillRect(x + 2, y + 2, 44, 44, color);
+    }, this);
+};
+
+Spriteset_MapTS.prototype.updateTiles = function() {
+    if (this._rangeTiles !== $gameMap.tiles()) {
+        this.updateRangeTiles();
+    }
+    if ($gameMap.startTiles().length == 0) {
+        this._startTilesSprite.hide();
+    }
+    this._tilesSprite.x = $gameScreen.zoomScale();
+    this._tilesSprite.y = $gameScreen.zoomScale();
+    this._tilesSprite.x = Math.round($gameMap.adjustX(0) * 48);
+    this._tilesSprite.y = Math.round($gameMap.adjustY(0) * 48);
+    this._tilesSprite.x += Math.round($gameScreen.shake());
 };
 
 Spriteset_MapTS.prototype.createCharacters = function() {
@@ -2441,10 +2781,6 @@ Spriteset_MapTS.prototype.isAnyoneMoving = function() {
     return false;
 };
 
-Spriteset_MapTS.prototype.isEffecting = function() {
-    return false;  // ?
-};
-
 Spriteset_MapTS.prototype.createPhase = function() {
     this._phaseSprite = new Sprite_PhaseTS();
     this.addChild(this._phaseSprite);
@@ -2452,6 +2788,18 @@ Spriteset_MapTS.prototype.createPhase = function() {
 
 Spriteset_MapTS.prototype.startPhase = function(phase) {
     this._phaseSprite.setup(phase);
+};
+
+Spriteset_MapTS.prototype.addBattler = function(event) {
+    var sprite = new Sprite_BattlerTS(event);
+    this._characterSprites.push(sprite);
+    this._enemySprites.push(sprite);
+    this._tilemap.addChild(sprite);
+};
+
+Spriteset_Base.prototype.createTurn = function() {
+    this._turnSprite = new Sprite_Turn();
+    this.addChild(this._turnSprite);
 };
 
 //-----------------------------------------------------------------------------
@@ -2504,6 +2852,7 @@ Sprite_BattlerTS.prototype.update = function() {
     Sprite_Character.prototype.update.call(this);
     this.updateDamagePopup();
     this.updateColor();
+    this.updateVisibility();
 };
 
 Sprite_BattlerTS.prototype.updateDamagePopup = function() {
@@ -2546,6 +2895,14 @@ Sprite_BattlerTS.prototype.updateColor = function() {
         this.setColorTone([0, 0, 0, 0]);
     } else {
         this.setColorTone([0, 0, 0, 255]);
+    }
+};
+
+Sprite_BattlerTS.prototype.updateVisibility = function() {
+    Sprite_Base.prototype.updateVisibility.call(this);
+    this._battlerTS.updateActive();
+    if (!this._battlerTS.isActive() && this._hpGaugeSprite) {
+        this._hpGaugeSprite.visible = false;
     }
 };
 
@@ -2705,6 +3062,60 @@ Sprite_PhaseTS.prototype.drawPhase = function(phase) {
 };
 
 //-----------------------------------------------------------------------------
+// Sprite_Turn
+//
+// The sprite for displaying the turn.
+
+function Sprite_Turn() {
+    this.initialize.apply(this, arguments);
+}
+
+Sprite_Turn.prototype = Object.create(Sprite.prototype);
+Sprite_Turn.prototype.constructor = Sprite_Turn;
+
+Sprite_Turn.prototype.initialize = function() {
+    Sprite.prototype.initialize.call(this);
+    this._turn = 0;
+    this.createBitmap();
+    this.update();
+};
+
+Sprite_Turn.prototype.createBitmap = function() {
+    this.bitmap = new Bitmap(96, 48);
+    this.bitmap.fontSize = 28;
+};
+
+Sprite_Turn.prototype.update = function() {
+    Sprite.prototype.update.call(this);
+    this.updateBitmap();
+    this.updatePosition();
+};
+
+Sprite_Turn.prototype.updateBitmap = function() {
+    if (this._turn !== $gameTroop.turnCount()) {
+        this._turn = $gameTroop.turnCount();
+        this.redraw();
+    }
+};
+
+Sprite_Turn.prototype.redraw = function() {
+    var text = this.turnText();
+    var width = this.bitmap.width;
+    var height = this.bitmap.height;
+    this.bitmap.clear();
+    this.bitmap.drawText(text, 0, 0, width, height, 'center');
+};
+
+Sprite_Turn.prototype.turnText = function() {
+    return TacticsSystem.turnTerm + ':' + this._turn;
+};
+
+Sprite_Turn.prototype.updatePosition = function() {
+    this.x = Graphics.width - this.bitmap.width - 24;
+    this.y = 24;
+};
+
+//-----------------------------------------------------------------------------
 // Scene_Map
 //
 // The scene class of the map screen.
@@ -2747,6 +3158,45 @@ DataManager.extractRangeData = function (object) {
     } else {
         return data.trim().split(' ');
     }
+};
+
+DataManager.extractInfoEvent = function (event) {
+    var meta = event.meta();
+    var metaActor = parseInt(meta['actor']);
+    var metaParty = parseInt(meta['party']);
+    var metaEnemy = parseInt(meta['enemy']);
+    var metaStart = meta['start'];
+    if (metaActor > 0) {
+        this.addGameActor(event, metaActor);
+    } else if (metaParty > 0) {
+        this.addGameParty(event, metaParty)
+    } else if (metaEnemy > 0) {
+        this.addGameEnemy(event, metaEnemy);
+    } else if (metaStart) {
+        this.addStartTile(event);
+    }
+};
+
+DataManager.addGameActor = function(event, actorId) {
+    var actorTS = new Game_ActorTS(event, actorId);
+    $gamePartyTS.addActorTS(actorTS);
+};
+
+DataManager.addGameParty = function(event, partyId) {
+    var actor = $gameParty.members()[partyId - 1];
+    var actorTS = new Game_ActorTS(event, actor.actorId());
+    actorTS.updateImage();
+    $gamePartyTS.addActorTS(actorTS);
+};
+
+DataManager.addGameEnemy = function(event, enemyId) {
+    var enemyTS = new Game_EnemyTS(event, enemyId);
+    $gameTroopTS.addEnemyTS(enemyTS);
+};
+
+DataManager.addStartTile = function(event) {
+    var tile = $gameMap.tile(event.x, event.y);
+    $gameMap.addStartTile(tile);
 };
 
 //-----------------------------------------------------------------------------
@@ -2912,8 +3362,10 @@ Game_BattlerBase.prototype.canUse = function(item) {
 };
 
 Game_BattlerBase.prototype.isItemRangeValid = function(item) {
-    var friendsUnitTS = this.friendsUnitTS();
-    var battler = friendsUnitTS.getBattlerTS(this);
+    var battler = this.friendsUnitTS().getBattlerTS(this);
+    if (!battler) {
+        battler = this.opponentsUnitTS().getBattlerTS(this);
+    }
     return battler.isItemRangeValid(item);
 };
 
@@ -2934,6 +3386,10 @@ Game_Actor.prototype.friendsUnitTS = function() {
     return $gamePartyTS;
 };
 
+Game_Actor.prototype.opponentsUnitTS = function() {
+    return $gameTroopTS;
+};
+
 //-----------------------------------------------------------------------------
 // Game_Enemy
 //
@@ -2941,6 +3397,10 @@ Game_Actor.prototype.friendsUnitTS = function() {
 
 Game_Enemy.prototype.friendsUnitTS = function() {
     return $gameTroopTS;
+};
+
+Game_Enemy.prototype.opponentsUnitTS = function() {
+    return $gamePartyTS;
 };
 
 //-----------------------------------------------------------------------------
@@ -2959,7 +3419,7 @@ Game_Party.prototype.setupTS = function(actors) {
 };
 
 Game_Party.prototype.maxBattleMembers = function() {
-    return this._maxBattleMembers;
+    return this._maxBattleMembers || 4;
 };
 
 Game_Party.prototype.members = function() {
@@ -2994,11 +3454,18 @@ TacticsSystem.Game_Map_intialize = Game_Map.prototype.initialize;
 Game_Map.prototype.initialize = function() {
     TacticsSystem.Game_Map_intialize.call(this);
     this._tiles = [];
+    this._startTiles = [];
     this._color = '';
+    this._destinationX = null;
+    this._destinationY = null;
 };
 
 Game_Map.prototype.addTile = function(tile) {
-    return this._tiles.push(tile);
+    this._tiles.push(tile);
+};
+
+Game_Map.prototype.addStartTile = function(tile) {
+    this._startTiles.push(tile);
 };
 
 Game_Map.prototype.positionTileX = function(tile) {
@@ -3021,8 +3488,16 @@ Game_Map.prototype.tiles = function() {
     return this._tiles;
 };
 
+Game_Map.prototype.startTiles = function() {
+    return this._startTiles;
+};
+
 Game_Map.prototype.eraseTiles = function() {
     this._tiles = [];
+};
+
+Game_Map.prototype.eraseStartTiles = function() {
+    this._startTiles = [];
 };
 
 Game_Map.prototype.isOnTiles = function(x, y) {
@@ -3041,6 +3516,48 @@ Game_Map.prototype.color = function() {
     return this._color;
 };
 
+Game_Map.prototype.performScroll = function(x, y) {
+    x = Math.floor(Math.min(x, $gameMap.width() - this.screenTileX()/2));
+    y = Math.floor(Math.min(y, $gameMap.height() - this.screenTileY()/2));
+    this._destinationX = Math.round(Math.max(x - this.screenTileX()/2, 0));
+    this._destinationY = Math.round(Math.max(y - this.screenTileY()/2, 0));
+    this._scrollSpeed = 5;
+};
+
+Game_Map.prototype.clearDestination = function() {
+    this._destinationX = null;
+    this._destinationY = null;
+};
+
+Game_Map.prototype.isDestinationValid = function() {
+    return this._destinationX !== null;
+};
+
+TacticsSystem.Game_Map_updateScroll = Game_Map.prototype.updateScroll;
+Game_Map.prototype.updateScroll = function() {
+    if (this.isDestinationValid()) {
+        var x = Math.max(this._displayX, 0);
+        var y = Math.max(this._displayY, 0);
+        if (y < this._destinationY) {
+            $gameMap.scrollDown(this.scrollDistance());
+        }
+        if (x > this._destinationX) {
+            $gameMap.scrollLeft(this.scrollDistance());
+        }
+        if (x < this._destinationX) {
+            $gameMap.scrollRight(this.scrollDistance());
+        }
+        if (y > this._destinationY) {
+            $gameMap.scrollUp(this.scrollDistance());
+        }
+        if (x === this._destinationX && y === this._destinationY) {
+            this.clearDestination();
+        }
+    } else {
+        TacticsSystem.Game_Map_updateScroll.call(this);
+    }
+};
+
 //-----------------------------------------------------------------------------
 // Game_Character
 //
@@ -3056,11 +3573,16 @@ Game_Character.prototype.searchLimit = function() {
 // The game object class for an event. It contains functionality for event page
 // switching and running parallel process events.
 
-TacticsSystem.Game_Event_initialize = Game_Event.prototype.initialize;
 Game_Event.prototype.initialize = function(mapId, eventId) {
-    TacticsSystem.Game_Event_initialize.call(this, mapId, eventId);
-    this.setName(this.event().name);
-    this.setMeta(this.event().meta);
+    Game_Character.prototype.initialize.call(this);
+    this._mapId = mapId;
+    this._eventId = eventId;
+    if (eventId !== -1) {
+        this.locate(this.event().x, this.event().y);
+        this.refresh();
+        this.setName(this.event().name);
+        this.setMeta(this.event().meta);
+    }
 };
 
 TacticsSystem.Game_Event_isCollidedWithEvents = Game_Event.prototype.isCollidedWithEvents;
@@ -3071,6 +3593,8 @@ Game_Event.prototype.isCollidedWithEvents = function(x, y) {
         return events.some(function(event) {
             return event.isNormalPriority() && !event.isActorTS();
         });
+    } else if (this.isEnemyTS()) {
+        return Game_Character.prototype.isCollidedWithEvents.call(this, x, y)
     } else {
         return TacticsSystem.Game_Event_isCollidedWithEvents.call(this, x, y);
     }
@@ -3097,7 +3621,7 @@ Game_Event.prototype.meta = function() {
 };
 
 Game_Event.prototype.isActorTS = function() {
-    return parseInt(this._meta['actor']) > 0;
+    return parseInt(this._meta['actor']) > 0 || parseInt(this._meta['party']) > 0;
 };
 
 Game_Event.prototype.isEnemyTS = function() {
@@ -3134,6 +3658,34 @@ Game_Event.prototype.tilesRange = function(distance) {
                 }
             }
         }
+    }
+};
+
+TacticsSystem.Game_Event_refresh = Game_Event.prototype.refresh;
+Game_Event.prototype.refresh = function() {
+    if (this._eventId !== -1) {
+        var oldPageIndex = this._pageIndex;
+        TacticsSystem.Game_Event_refresh.call(this);
+        if (oldPageIndex !== this._pageIndex && oldPageIndex == -1) {
+            if (this.isActorTS() || this.isEnemyTS()) {
+                var battlerTS = this.battlerTS();
+                battlerTS.activeEffect();
+                if (battlerTS.requestImage()) {
+                    battlerTS.setImage();
+                }
+            }
+        }
+    }
+};
+
+Game_Event.prototype.isActive = function() {
+    return this.findProperPageIndex() !== -1 && !this._erased;
+};
+
+TacticsSystem.Game_Event_updateParallel = Game_Event.prototype.updateParallel;
+Game_Event.prototype.updateParallel = function() {
+    if (!this.meta()['trigger']) {
+        TacticsSystem.Game_Event_updateParallel.call(this);
     }
 };
 
@@ -3217,10 +3769,10 @@ Bitmap.prototype.drawLine = function(x1, y1, x2, y2) {
 };
 
 (function() {
-    var Game_Interpreter_pluginCommandTS = Game_Interpreter.prototype.pluginCommand;
+    TacticsSystem.Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
     Game_Interpreter.prototype.pluginCommand = function(command, args) {
-        Game_Interpreter_pluginCommandTS.call(this, command, args);
-        if (command === 'startBattleTS') {
+        TacticsSystem.Game_Interpreter_pluginCommand.call(this, command, args);
+        if (command === 'TS.startBattle') {
             BattleManagerTS.setup();
             this.setWaitMode('battleTS');
             SceneManager.push(Scene_BattleTS);
