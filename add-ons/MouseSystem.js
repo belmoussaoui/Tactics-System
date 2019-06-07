@@ -1,16 +1,19 @@
 //=============================================================================
-// MouseSystem.js v0.1
+// MouseSystem.js v0.2
 //=============================================================================
 
 /*:
  * @plugindesc Add features for control with the mouse for the TacticsSystem.
- * @author El Moussaoui Bilal (https://twitter.com/embxii_)
+ * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
  *
  * @help
  *
  * For more information, please consult :
  *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system.97023/
  */
+
+var MouseSystem = MouseSystem || {};
+MouseSystem.Parameters = PluginManager.parameters('MouseSystem');
 
 //-----------------------------------------------------------------------------
 /**
@@ -111,12 +114,53 @@ Input._updateGamepadState = function(gamepad) {
     }
 };
 
+/**
+ * [read-only] The x coordinate on the canvas area of the latest touch event.
+ *
+ * @static
+ * @property x
+ * @type Number
+ */
+Object.defineProperty(TouchInput, 'x', {
+    get: function() {
+        return this._currentX;
+    },
+    configurable: true
+});
+
+/**
+ * [read-only] The y coordinate on the canvas area of the latest touch event.
+ *
+ * @static
+ * @property y
+ * @type Number
+ */
+Object.defineProperty(TouchInput, 'y', {
+    get: function() {
+        return this._currentY;
+    },
+    configurable: true
+});
+
 TouchInput.setActive = function(value) {
     this._active = value;
 };
 
 TouchInput.isActive = function() {
     return this._active;
+};
+
+//-----------------------------------------------------------------------------
+// BattleManagerTS
+//
+// The static class that manages battle progress.
+
+MouseSystem.BattleManagerTS_udpateMove = BattleManagerTS.updateMove;
+BattleManagerTS.updateMove = function() {
+    MouseSystem.BattleManagerTS_udpateMove.call(this);
+    var x = $gameSelectorTS.x;
+    var y = $gameSelectorTS.y;
+    $gameMap.performScroll(x, y);
 };
 
 //-----------------------------------------------------------------------------
@@ -175,10 +219,43 @@ Game_SelectorTS.prototype.updateScrollInput = function(x1, y1, x2, y2) {
     }
 };
 
+Game_SelectorTS.prototype.canMove = function() {
+    return !$gameMap.isEventRunning() && !$gameMessage.isBusy() && !BattleManagerTS.isInputting();
+};
+
+//-----------------------------------------------------------------------------
+// Game_Map
+//
+// The game object class for a map. It contains scrolling and passage
+// determination functions.
+
 Game_Map.prototype.roundXWithDirection8 = function(x, d) {
     return this.roundX(x + (d === 0 || d === 2 || d === 8 ? 0 : d % 3 === 0 ? 1 : -1));
 };
 
 Game_Map.prototype.roundYWithDirection8 = function(y, d) {
     return this.roundY(y + (d === 0 || d === 4 || d === 6 ? 0 : d <= 3 ? 1 : -1));
+};
+
+//-----------------------------------------------------------------------------
+// Window_Selectable
+//
+// The window class with cursor movement and scroll functions.
+
+Window_Selectable.prototype.processTouch = function() {
+    if (this.isOpenAndActive()) {
+        if (TouchInput.isTriggered() && this.isTouchedInsideFrame()) {
+            this._touching = true;
+            this.onTouch(true);
+        } else if (TouchInput.isCancelled()) {
+            if (this.isCancelEnabled()) {
+                this.processCancel();
+            }
+        }
+        if (this.isTouchedInsideFrame()) {
+            this.onTouch(false);
+        }
+    } else {
+        this._touching = false;
+    }
 };

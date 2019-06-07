@@ -1,10 +1,10 @@
 //=============================================================================
-// CombatScene.js v0.1.1
+// CombatScene.js v0.2
 //=============================================================================
 
 /*:
  * @plugindesc Add-on to display the combat animation scene for the TacticsSystem.
- * @author El Moussaoui Bilal (https://twitter.com/embxii_)
+ * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
 *
  * @param transition delay
  * @desc The transition delay to display the scene combat
@@ -62,6 +62,7 @@ Scene_Combat.prototype.createSpriteset = function() {
 
 Scene_Combat.prototype.createAllWindows = function() {
     this.createLogWindow();
+    this.createStatusWindow();
     this.createMessageWindow();
 };
 
@@ -70,6 +71,15 @@ Scene_Combat.prototype.createLogWindow = function() {
     this._logWindow.setSpriteset(this._spriteset);
     BattleManagerTS.setLogWindow(this._logWindow);
     this.addWindow(this._logWindow);
+};
+
+Scene_Combat.prototype.createStatusWindow = function() {
+    this._statusSubjectWindow = new Window_BattleStatusTS();
+    this._statusSubjectWindow.x = Graphics.width/2 + 32;
+    this.addWindow(this._statusSubjectWindow);
+    this._statusTargetWindow = new Window_BattleStatusTS();
+    this._statusTargetWindow.x = Graphics.width/2 - this._statusTargetWindow.width - 32;
+    this.addWindow(this._statusTargetWindow);
 };
 
 Scene_Combat.prototype.createMessageWindow = function() {
@@ -83,8 +93,23 @@ Scene_Combat.prototype.createMessageWindow = function() {
 Scene_Combat.prototype.update = function() {
     var active = this.isActive();
     $gameScreen.update();
+    this.updateSubjectStatusWindow();
     BattleManagerTS.update();
     Scene_Base.prototype.update.call(this);
+};
+
+Scene_Combat.prototype.updateSubjectStatusWindow = function() {
+    var select = BattleManagerTS.subjectTS();
+    var target = BattleManagerTS._target || $gameSelectorTS.select();
+    if (target) {
+        if (select.isActor()) {
+            this._statusSubjectWindow.open(select);
+            this._statusTargetWindow.open(target);
+        } else {
+            this._statusSubjectWindow.open(target);
+            this._statusTargetWindow.open(select);
+        }
+    }
 };
 
 Scene_Combat.prototype.needsSlowFadeOut = function() {
@@ -168,6 +193,10 @@ BattleManagerTS.setupAction = function() {
     var action = this.subject().currentAction();
     if (action && action.isValid()) {
         this.setupLocalBattle(action);
+        var target = action.makeTargets()[0];
+        var friendsUnitTS = target.friendsUnitTS();
+        var battler = friendsUnitTS.getBattlerTS(target);
+        $gameSelectorTS.performTransfer(battler.x, battler.y);
         this._startCombat = true;
     } else {
         this.processAction();
