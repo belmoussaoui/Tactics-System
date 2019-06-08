@@ -41,12 +41,24 @@ To start a battle, use the following command : startBattleTS. This command is bl
 > Other plugin commands should be added soon.
 
 # Database
+## Actors, Classes and Enemies
 
-| Note                    | data                     | description                           |
-|-------------------------|--------------------------|---------------------------------------|
-|`<move:int>`             | _actors/classes/enemies_ | This defines a unit’s ability to move.
+| Note                    | description                          |
+|-------------------------|--------------------------------------|
+|`<move:int>`             | This defines a unit’s ability to move.
 
-> All notes in the above table must be indicated in the note section in an event.
+> All notes in the above table must be indicated in the note section in database.
+
+## Skills, items and weapons
+
+| Note                    | description                           |
+|-------------------------|---------------------------------------|
+| `<range:[coordinates]>` | A new attribute is the range of the action. By example, `<range:[[x+1, y], [x-1, y], [x, y+1], [x, y-1]]>` indicates the four adjacent cells of the unit.
+| `<range:diamond int>`   | Defines a range in the shape of a diamond of size int.
+| `<range:rectangle int>` | Defines a range in the shape of a ractangle of size int.
+| `<range:line int>`      | Defines a range in the shape of a line of size int.
+
+> All notes in the above table must be indicated in the note section in database.
 
 # Note
 You need an image _Selector.png_ in the **img/system** folder to display the selector.
