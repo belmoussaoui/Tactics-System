@@ -45,10 +45,6 @@ To start a battle, use the following command : startBattleTS. This command is bl
 | Note                    | data                     | description                           |
 |-------------------------|--------------------------|---------------------------------------|
 |`<move:int>`             | _actors/classes/enemies_ | This defines a unit’s ability to move.
-| `<range:[coordinates]>` | _skills/items/weapons_   | A new attribute is the range of the action. By example, `<range:[[x+1, y], [x-1, y], [x, y+1], [x, y-1]]>` indicates the four adjacent cells of the unit.
-| `<range:diamond int>`   | _skills/items/weapons_   | Defines a range in the shape of a diamond of size int.
-| `<range:rectangle int>` | _skills/items/weapons_   | Defines a range in the shape of a ractangle of size int.
-| `<range:line int>`      | _skills/items/weapons_   | Defines a range in the shape of a line of size int.
 
 > All notes in the above table must be indicated in the note section in an event.
 
