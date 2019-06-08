@@ -41,7 +41,7 @@ To start a battle, use the following command : startBattleTS. This command is bl
 > Other plugin commands should be added soon.
 
 # Database
-| Note                    | data                     |description                            |
+| Note                    | data                     | description                           |
 |-------------------------|--------------------------|---------------------------------------|
 |`<move:int>`             | _actors/classes/enemies_ | This defines a unit’s ability to move.
 | `<range:[coordinates]>` | _skills/items/weapons_   | A new attribute is the range of the action. By example, `<range:[[x+1, y], [x-1, y], [x, y+1], [x, y-1]]>` indicates the four adjacent cells of the unit.
