@@ -41,6 +41,7 @@ To start a battle, use the following command : startBattleTS. This command is bl
 > Other plugin commands should be added soon.
 
 # Database
+
 | Note                    | data                     | description                           |
 |-------------------------|--------------------------|---------------------------------------|
 |`<move:int>`             | _actors/classes/enemies_ | This defines a unit’s ability to move.
