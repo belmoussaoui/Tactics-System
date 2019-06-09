@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.5.0.1
+// TacticsSystem.js v0.5.1
 //=============================================================================
 
 /*:
@@ -552,7 +552,6 @@ BattleManagerTS.initMembers = function() {
     this._logWindow = null;
     this._spriteset = null;
     this._subject = null;
-    this._canLose = false;
     this._range = null;
     this._targets = [];
     this._rewards = {};
@@ -563,6 +562,7 @@ BattleManagerTS.initMembers = function() {
     this._actionBattlers = [];
     this._pendingIndex = -1;
     this._target = null;
+    this._isDefeated = false;
 };
 
 BattleManagerTS.createGameObjects = function() {
@@ -1127,11 +1127,9 @@ BattleManagerTS.selectPreviousCommand = function() {
 BattleManagerTS.checkBattleEnd = function() {
     if (this._phase && BattleManagerTS.isStartPhase()) {
         if ($gamePartyTS.isAllDead()) {
-            $gameSelectorTS.setTransparent(true);
             this.processDefeat();
             return true;
         } else if ($gameTroopTS.isAllDead()) {
-            $gameSelectorTS.setTransparent(true);
             this.processVictory();
             return true;
         }
@@ -1140,6 +1138,7 @@ BattleManagerTS.checkBattleEnd = function() {
 };
 
 BattleManagerTS.processVictory = function() {
+    $gameSelectorTS.setTransparent(true);
     $gameParty.setupTS($gamePartyTS.battlerMembers());
     $gameTroop.setupTS($gameTroopTS.battlerMembers());
     $gameParty.removeBattleStates();
@@ -1154,9 +1153,11 @@ BattleManagerTS.processVictory = function() {
 };
 
 BattleManagerTS.processDefeat = function() {
+    $gameSelectorTS.setTransparent(true);
+    this._isDefeated = true;
     this.displayDefeatMessage();
     this.playDefeatMe();
-    if (this._canLose) { // fix this
+    if (this._canLose) {
         this.replayBgmAndBgs();
     } else {
         AudioManager.stopBgm();
@@ -1259,7 +1260,7 @@ BattleManagerTS.gainDropItems = function() {
 };
 
 BattleManagerTS.updateBattleEnd = function() {
-    if (!this._escaped && $gameParty.isAllDead()) {
+    if (!this._escaped && $gameParty.isAllDead() || this._isDefeated) {
         if (this._canLose) {
             $gameParty.reviveBattleMembers();
             SceneManager.pop();
@@ -3776,10 +3777,18 @@ Bitmap.prototype.drawLine = function(x1, y1, x2, y2) {
     TacticsSystem.Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
     Game_Interpreter.prototype.pluginCommand = function(command, args) {
         TacticsSystem.Game_Interpreter_pluginCommand.call(this, command, args);
-        if (command === 'TS.startBattle') {
-            BattleManagerTS.setup();
-            this.setWaitMode('battleTS');
-            SceneManager.push(Scene_BattleTS);
+        switch(command) {
+            case 'TS.startBattle':
+                BattleManagerTS.setup();
+                this.setWaitMode('battleTS');
+                SceneManager.push(Scene_BattleTS);
+                break;
+            case 'TS.winBattle':
+                BattleManagerTS.processVictory();
+                break;
+            case 'TS.loseBattle':
+                BattleManagerTS.processDefeat();
+                break;
         }
     };
 })();
