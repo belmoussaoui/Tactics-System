@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.5.1
+// TacticsSystem.js v0.5.1.1
 //=============================================================================
 
 /*:
@@ -2791,13 +2791,6 @@ Spriteset_MapTS.prototype.startPhase = function(phase) {
     this._phaseSprite.setup(phase);
 };
 
-Spriteset_MapTS.prototype.addBattler = function(event) {
-    var sprite = new Sprite_BattlerTS(event);
-    this._characterSprites.push(sprite);
-    this._enemySprites.push(sprite);
-    this._tilemap.addChild(sprite);
-};
-
 Spriteset_MapTS.prototype.createTurn = function() {
     this._turnSprite = new Sprite_Turn();
     this.addChild(this._turnSprite);
@@ -2857,7 +2850,6 @@ Sprite_BattlerTS.prototype.update = function() {
     Sprite_Character.prototype.update.call(this);
     this.updateDamagePopup();
     this.updateColor();
-    this.updateVisibility();
 };
 
 Sprite_BattlerTS.prototype.updateDamagePopup = function() {
@@ -2904,7 +2896,7 @@ Sprite_BattlerTS.prototype.updateColor = function() {
 };
 
 Sprite_BattlerTS.prototype.updateVisibility = function() {
-    Sprite_Base.prototype.updateVisibility.call(this);
+    Sprite_Character.prototype.updateVisibility.call(this);
     this._battlerTS.updateActive();
     if (!this._battlerTS.isActive() && this._hpGaugeSprite) {
         this._hpGaugeSprite.visible = false;
@@ -3578,16 +3570,11 @@ Game_Character.prototype.searchLimit = function() {
 // The game object class for an event. It contains functionality for event page
 // switching and running parallel process events.
 
+TacticsSystem.Game_Event_initialize = Game_Event.prototype.initialize;
 Game_Event.prototype.initialize = function(mapId, eventId) {
-    Game_Character.prototype.initialize.call(this);
-    this._mapId = mapId;
-    this._eventId = eventId;
-    if (eventId !== -1) {
-        this.locate(this.event().x, this.event().y);
-        this.refresh();
-        this.setName(this.event().name);
-        this.setMeta(this.event().meta);
-    }
+    TacticsSystem.Game_Event_initialize.call(this, mapId, eventId);
+    this.setName(this.event().name);
+    this.setMeta(this.event().meta);
 };
 
 TacticsSystem.Game_Event_isCollidedWithEvents = Game_Event.prototype.isCollidedWithEvents;
@@ -3720,7 +3707,7 @@ Game_Interpreter.prototype.updateWaitMode = function() {
 
 TacticsSystem.Window_BattleLog_showNormalAnimation = Window_BattleLog.prototype.showNormalAnimation;
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
-    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) { // to do
+    if ($gameParty.inBattleTS() && !$gameParty.inBattle()) {
         var animation = $dataAnimations[animationId];
         if (animation) {
             targets.forEach(function(target) {
