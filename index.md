@@ -32,6 +32,7 @@ We need to bind the events to the actors and enemies in the database. The bond o
 > All notes in the above table must be indicated in the note section in an event.
 
 ## Start Battle
+
 | Plugin command  | description                            |
 |-----------------|----------------------------------------|
 |`TS.startBattle` | To start a battle. This command is blocking. At the end of the combat, the system resumes the flow of the event used.  All other events are being updated in parallel.
