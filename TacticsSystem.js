@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.5
+// TacticsSystem.js v0.5.1
 //=============================================================================
 
 /*:
@@ -2797,9 +2797,13 @@ Spriteset_MapTS.prototype.addBattler = function(event) {
     this._tilemap.addChild(sprite);
 };
 
-Spriteset_Base.prototype.createTurn = function() {
+Spriteset_MapTS.prototype.createTurn = function() {
     this._turnSprite = new Sprite_Turn();
     this.addChild(this._turnSprite);
+};
+
+Spriteset_MapTS.prototype.isEffecting = function() {
+    return false;
 };
 
 //-----------------------------------------------------------------------------
