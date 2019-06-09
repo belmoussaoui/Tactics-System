@@ -26,7 +26,7 @@ We need to bind the events to the actors and enemies in the database. The bond o
 |----------------|-------------------------------------------|
 |`<actor:id>`    | Determine the event as an actor for battle. The identifier represents that of the actor in the database.  The image representing the actor is not directly associated with it. You must manually display the correct image in the event.                                          |
 |`<party:id>`    | Determine the event as an actor for battle. The identifier represents that of the actor in the party. By example, `<party:1>` bond the event with the leader of party. You should not manually display the correct image in the event.
-|`<enemy:id>`    | Determine the event as an enemy for battle.                                          |
+|`<enemy:id>`    | Determine the event as an enemy for battle.
 |`<aggro:int>`   | An enemy have also a aggro (aggresive) parameter who defines the action area. By default, this parameter is the same than the move attribute. Use this note for determines an action area.
 
 > All notes in the above table must be indicated in the note section in an event.
@@ -34,21 +34,31 @@ We need to bind the events to the actors and enemies in the database. The bond o
 ## Start Battle
 To start a battle, use the following command : startBattleTS. This command is blocking. At the end of the combat, the system resumes the flow of the event used.  All other events are being updated in parallel.
 
-| Plugin command    | description                            |
-|----------------   |----------------------------------------|
-|`TS.startBattle`   | To start a battle. This command is blocking. At the end of the combat, the system resumes the flow of the event used.  All other events are being updated in parallel.                           |
+| Plugin command  | description                            |
+|-----------------|----------------------------------------|
+|`TS.startBattle` | To start a battle. This command is blocking. At the end of the combat, the system resumes the flow of the event used.  All other events are being updated in parallel.
+
 > Other plugin commands should be added soon.
 
 # Database
-| Note   | data |description                            |
-|--------------------------|----------|------------------------------|
-|`<move:int>`   | _actors/classes/enemies_ | This defines a unit’s ability to move.
-| `<range:[coordinates]>` | _skills/items/weapons_ | A new attribute is the range of the action. By example, `<range:[[x+1, y], [x-1, y], [x, y+1], [x, y-1]]>` indicates the four adjacent cells of the unit.
-| `<range:diamond int>` | _skills/items/weapons_ | Defines a range in the shape of a diamond of size int.
-| `<range:rectangle int>` | _skills/items/weapons_ | Defines a range in the shape of a ractangle of size int.
-| `<range:line int>` | _skills/items/weapons_ | Defines a range in the shape of a line of size int.
+## Actors, Classes and Enemies
 
-> All notes in the above table must be indicated in the note section in an event.
+| Note                    | description                          |
+|-------------------------|--------------------------------------|
+|`<move:int>`             | This defines a unit’s ability to move.
+
+> All notes in the above table must be indicated in the note section in database.
+
+## Skills, items and weapons
+
+| Note                    | description                           |
+|-------------------------|---------------------------------------|
+| `<range:[coordinates]>` | A new attribute is the range of the action. By example, `<range:[[x+1, y], [x-1, y], [x, y+1], [x, y-1]]>` indicates the four adjacent cells of the unit.
+| `<range:diamond int>`   | Defines a range in the shape of a diamond of size int.
+| `<range:rectangle int>` | Defines a range in the shape of a ractangle of size int.
+| `<range:line int>`      | Defines a range in the shape of a line of size int.
+
+> All notes in the above table must be indicated in the note section in database.
 
 # Note
 You need an image _Selector.png_ in the **img/system** folder to display the selector.
