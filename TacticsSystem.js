@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.5.1.1
+// TacticsSystem.js v0.5.1.2
 //=============================================================================
 
 /*:
@@ -131,7 +131,11 @@
  * For more information, please consult :
  *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system.97023/
  * Plugin Command:
- *   StartBattleTS          # Start battle scene
+ *   TS.StartBattle          # To start a battle. This command is blocking.
+ *                           # At the end of the combat, the system resumes the flow of the event used.
+ *                           # All other events are being updated in parallel.
+ *   TS.winBattle            # Proceed immediately to the victory of the battle.
+ *   TS.loseBattle           # Proceed immediately to the defeat of the battle.
  */
 
 var TacticsSystem = TacticsSystem || {};
@@ -566,6 +570,8 @@ BattleManagerTS.initMembers = function() {
 };
 
 BattleManagerTS.createGameObjects = function() {
+    $gamePartyTS.clear();
+    $gameTroopTS.clear();
     for (var i = 0; i < $gameMap.events().length; i++) {
         var event = $gameMap.events()[i];
         DataManager.extractInfoEvent(event);
@@ -1167,6 +1173,8 @@ BattleManagerTS.processDefeat = function() {
 
 BattleManagerTS.endBattle = function(result) {
     this._phase = 'battleEnd';
+    $gamePartyTS.clear();
+    $gameTroopTS.clear();
     if (this._eventCallback) {
         this._eventCallback(result);
     }
@@ -1311,6 +1319,7 @@ BattleManagerTS.terminate = function() {
     this.setSwitch();
     this.setVariables();
     $gamePlayer.setThrough(false);
+    $gamePlayer.refresh();
     $gameTemp.clearPosition();
 };
 
@@ -2139,6 +2148,12 @@ Game_PartyTS.prototype.initialize = function() {
     this._inBattleTS = false;
 };
 
+Game_PartyTS.prototype.clear = function() {
+    this._actors = [];
+    this._inBattleTS = false;
+    this._maxBattleMembers = 4;
+};
+
 Game_PartyTS.prototype.setup = function(actors) {
     this._actors = actors;
     this._maxBattleMembers = actors.length;
@@ -2208,6 +2223,10 @@ Game_TroopTS.prototype.battleMembers = function() {
     return $gameTroop.activeMembers().map(function(member) {
         return this.getBattlerTS(member);
     }, this);
+};
+
+Game_TroopTS.prototype.clear = function() {
+    this._enemies = [];
 };
 
 //-----------------------------------------------------------------------------
@@ -3412,11 +3431,17 @@ Game_Party.prototype.setupTS = function(actors) {
         actorsId.push(actors[i].actorId());
     }
     this._maxBattleMembers = actors.length;
-    this._actors = actorsId;
+
+    actorsId.forEach(function(actorId) {
+        if (this._actors.contains(actorId)) {
+            this.removeActor(actorId);
+        }
+    }, this);
+    this._actors = actorsId.concat(this._actors);
 };
 
 Game_Party.prototype.maxBattleMembers = function() {
-    return this._maxBattleMembers || 4;
+    return this.inBattleTS() ? this._maxBattleMembers : 4;
 };
 
 Game_Party.prototype.members = function() {
@@ -3659,7 +3684,7 @@ Game_Event.prototype.refresh = function() {
         var oldPageIndex = this._pageIndex;
         TacticsSystem.Game_Event_refresh.call(this);
         if (oldPageIndex !== this._pageIndex && oldPageIndex == -1) {
-            if (this.isActorTS() || this.isEnemyTS()) {
+            if ($gamePartyTS.inBattleTS() && (this.isActorTS() || this.isEnemyTS())) {
                 var battlerTS = this.battlerTS();
                 battlerTS.activeEffect();
                 if (battlerTS.requestImage()) {
