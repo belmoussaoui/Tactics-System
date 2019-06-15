@@ -2173,19 +2173,21 @@ Game_PartyTS.prototype.initialize = function() {
 
 Game_PartyTS.prototype.clear = function() {
     this._actors = [];
-    this._inBattleTS = false;
     this._maxBattleMembers = 4;
+    this._inBattleTS = false;
+    $gameParty.setMaxBattleMembers();
 };
 
-Game_PartyTS.prototype.setup = function(actors) {
-    this._actors = actors;
-    this._maxBattleMembers = actors.length;
+Game_PartyTS.prototype.setup = function() {
+    this._actors = [];
+    this._maxBattleMembers = 0;
     this._inBattleTS = true;
+    $gameParty.setMaxBattleMembers();
 };
 
 Game_PartyTS.prototype.addActorTS = function(actor) {
     this._actors.push(actor);
-    this._maxBattleMembers = this._actors.length;
+    this._maxBattleMembers++;
     this._inBattleTS = true;
 };
 
@@ -3569,6 +3571,10 @@ Game_Party.prototype.setupTS = function(actors) {
         }
     }, this);
     this._actors = actorsId.concat(this._actors);
+};
+
+Game_Party.prototype.setMaxBattleMembers = function() {
+    this._maxBattleMembers = this.allMembers().length;
 };
 
 Game_Party.prototype.maxBattleMembers = function() {
