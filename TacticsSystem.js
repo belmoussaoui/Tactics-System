@@ -986,18 +986,23 @@ BattleManagerTS.processAction = function() {
         action.prepare();
         if (action.isValid()) {
             this.startAction();
-        } else {
-            this._subject.endAction();
+        } else {  // last action
+            this.endAction();
         }
-        subject.removeCurrentAction();
     } else {
-        subject.onAllActionsEnd();
-        this._logWindow.displayAutoAffectedStatus(subject);
-        this._logWindow.displayCurrentState(subject);
-        this._logWindow.displayRegeneration(subject);
-        this._phase = 'endAction';
+        this.endAction();
     }
 };
+
+BattleManagerTS.endAction = function() {
+    var subject = this.subject();
+    subject.onAllActionsEnd();
+    this._logWindow.displayAutoAffectedStatus(subject);
+    this._logWindow.displayCurrentState(subject);
+    this._logWindow.displayRegeneration(subject);
+    this.processCancel();
+    this._phase = 'endAction';
+}
 
 BattleManagerTS.startAction = function() {
     var subject = this.subject();
@@ -1014,12 +1019,22 @@ BattleManagerTS.startAction = function() {
 BattleManagerTS.updateAction = function() {
     var target = this._targets.shift();
     if (target) {
-        var targetTS = target.getBattlerTS();
+        var targetTS = target.battlerTS();
         $gameSelectorTS.performTransfer(targetTS.x, targetTS.y);
         this.turnTowardCharacter(targetTS);
         this.invokeAction(this.subject(), target);
     } else {
         this._logWindow.endAction(this.subject());
+        this.selectNextCommand();
+    }
+};
+
+BattleManagerTS.selectNextCommand = function() {
+    var subject = this.subject();
+    if (subject.nextAction() && subject.isActor()) {
+        this.processCancel();
+        this._phase = 'input';
+    } else {
         this.processAction();
     }
 };
@@ -1084,13 +1099,12 @@ BattleManagerTS.endEnemyPhase = function() {
 };
 
 BattleManagerTS.endBattlePhase = function() {
-    this._subject.endAction();
-    $gameMap.eraseTiles();
     if (this._subject.isActor()) {
         this._phase = 'startPlayer';
     } else {
         this._phase = 'startEnemy';
     }
+    this._subject.onTurnEnd();
 };
 
 BattleManagerTS.refreshBlueCells = function() {
@@ -1669,6 +1683,10 @@ Game_BattlerTS.prototype.isActive = function() {
     return this._active;
 };
 
+Game_BattlerTS.prototype.move = function() {
+    return this._move;
+};
+
 Game_BattlerTS.prototype.requestImage = function() {
     return this._requestImage;
 };
@@ -1686,10 +1704,11 @@ Game_BattlerTS.prototype.canPlay = function() {
 };
 
 Game_BattlerTS.prototype.onTurnStart = function() {
+    this._event.setStepAnime(true);
     this._hasPlayed = false;
 };
 
-Game_BattlerTS.prototype.endAction = function() {
+Game_BattlerTS.prototype.onTurnEnd = function() {
     this.defaultDirection();
     this._event.setStepAnime(false);
     this._hasPlayed = true;
@@ -1869,7 +1888,6 @@ Game_ActorTS.prototype.friendsUnit = function() {
 
 Game_ActorTS.prototype.onTurnStart = function() {
     Game_BattlerTS.prototype.onTurnStart.call(this);
-    this._event.setStepAnime(true);
     this.battler().makeActions();
 };
 
@@ -2276,7 +2294,7 @@ Window_ActorCommandTS.prototype.makeCommandList = function() {
 };
 
 Window_ActorCommandTS.prototype.addActionCommand = function() {
-    var actorTS = this._actor.getBattlerTS();
+    var actorTS = this._actor.battlerTS();
     actorTS.checkEventTriggerThere();
     actorTS.actions().forEach(function(action) {
         this.addCommand(action.name(), 'action');
@@ -3420,7 +3438,7 @@ Game_Action.prototype.applyMinMaxVariance = function(damage, variance, minMax) {
 //
 // The superclass of Game_Battler. It mainly contains parameters calculation.
 
-Game_BattlerBase.prototype.getBattlerTS = function() {
+Game_BattlerBase.prototype.battlerTS = function() {
     return this.friendsUnitTS().getBattlerTS(this);
 };
 
@@ -3435,11 +3453,7 @@ Game_BattlerBase.prototype.canUse = function(item) {
 };
 
 Game_BattlerBase.prototype.isItemRangeValid = function(item) {
-    var battler = this.getBattlerTS(this);
-    // for restriction state ?
-    //if (!battler) {
-    //    battler = this.opponentsUnitTS().getBattlerTS(this);
-    //}
+    var battler = this.battlerTS();
     return battler.isItemRangeValid(item);
 };
 
@@ -3449,6 +3463,43 @@ Game_BattlerBase.prototype.isOccasionOk = function(item) {
     } else {
         return item.occasion === 0 || item.occasion === 2;
     }
+};
+
+//-----------------------------------------------------------------------------
+// Game_Battler
+//
+// The superclass of Game_Actor and Game_Enemy. It contains methods for sprites
+// and actions.
+
+TacticsSystem.Game_Battler_makeActionTimes = Game_Battler.prototype.makeActionTimes;
+Game_Battler.prototype.makeActionTimes = function() {
+    //var actionTimes = this.battlerTS().move();
+    return TacticsSystem.Game_Battler_makeActionTimes.call(this) + 1;
+};
+
+TacticsSystem.Game_Battler_initMembers = Game_Battler.prototype.initMembers;
+Game_Battler.prototype.initMembers = function() {
+    TacticsSystem.Game_Battler_initMembers.call(this);
+     this._actionIndex = 0;
+};
+
+Game_Battler.prototype.nextAction = function() {
+    this._actionIndex++;
+    if (this._actionIndex < this.numActions() - 1) {
+        return true;
+    } else {
+        return false;
+    }
+};
+
+Game_Battler.prototype.currentAction = function() {
+    return this._actions[this._actionIndex];
+};
+
+TacticsSystem.Game_Battler_clearActions = Game_Battler.prototype.clearActions;
+Game_Battler.prototype.clearActions = function() {
+    TacticsSystem.Game_Battler_clearActions.call(this);
+    this._actionIndex = 0;
 };
 
 //-----------------------------------------------------------------------------
@@ -3462,6 +3513,15 @@ Game_Actor.prototype.friendsUnitTS = function() {
 
 Game_Actor.prototype.opponentsUnitTS = function() {
     return $gameTroopTS;
+};
+
+TacticsSystem.Game_Actor_inputtingAction = Game_Actor.prototype.inputtingAction;
+Game_Actor.prototype.inputtingAction = function() {
+    if ($gamePartyTS.inBattleTS()) {
+        return this.action(this._actionIndex);
+    } else {
+        return TacticsSystem.Game_Actor_inputtingAction.call(this);
+    }
 };
 
 //-----------------------------------------------------------------------------
@@ -3807,7 +3867,7 @@ Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, 
         var animation = $dataAnimations[animationId];
         if (animation) {
             targets.forEach(function(target) {
-                var targetTS = target.getBattlerTS();
+                var targetTS = target.battlerTS();
                 targetTS.event().requestAnimation(animationId);
             });
         }
