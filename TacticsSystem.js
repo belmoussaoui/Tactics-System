@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v0.5.2
+// TacticsSystem.js v0.6
 //=============================================================================
 
 /*:
@@ -154,7 +154,7 @@ TacticsSystem.Parameters = PluginManager.parameters('TacticsSystem');
 
 TacticsSystem.cursorSpeed =            Number(TacticsSystem.Parameters['cursor speed']);
 TacticsSystem.gridOpacity =            Number(TacticsSystem.Parameters['grid opacity']);
-TacticsSystem.movePoints =             Number(TacticsSystem.Parameters['move points']);
+TacticsSystem.mvp =                    Number(TacticsSystem.Parameters['move points']);
 TacticsSystem.actionRange =            String(TacticsSystem.Parameters['action range']);
 TacticsSystem.moveScopeColor =         String(TacticsSystem.Parameters['move scope color']);
 TacticsSystem.allyScopeColor =         String(TacticsSystem.Parameters['ally scope color']);
@@ -871,10 +871,10 @@ BattleManagerTS.updateEnemyPhase = function() {
     $gameMap.eraseTiles();
     if (x !== pos.x || y !== pos.y) {
         $gameSelectorTS.performTransfer(pos.x, pos.y);
-        this._phase = 'move';
     } else {
-        this.setupAction();
+        $gameSelectorTS.performTransfer(pos.x, pos.y);
     }
+    this._phase = 'move';
 };
 
 BattleManagerTS.updateSelect = function() {
@@ -898,6 +898,7 @@ BattleManagerTS.updateMove = function() {
     var y = $gameSelectorTS.y;
     this._subject.moveStraightTo(x, y);
     if (this._subject.pos(x, y) && !this._subject.isMoving()) {
+        this.subject().setMoveActionIndex();
         if (this.subject().isActor() && !this.subject().isRestricted()) {
             this._subject.checkEventTriggerTouch();
             this._phase = 'input';
@@ -1641,11 +1642,12 @@ Game_BattlerTS.prototype.constructor = Game_BattlerTS;
 
 Object.defineProperties(Game_BattlerTS.prototype, {
     x: { get: function() { return this._x; }, configurable: true },
-    y: { get: function() { return this._y; }, configurable: true }
+    y: { get: function() { return this._y; }, configurable: true },
+    mvp: { get: function() { return this.tparam('mvp') || TacticsSystem.mvp; }, configurable: true }
 });
 
 Game_BattlerTS.prototype.initialize = function(event) {
-    this.initMembers()
+    this.initMembers();
     this._x = event.x;
     this._y = event.y;
     this._event = event;
@@ -1683,10 +1685,6 @@ Game_BattlerTS.prototype.isActive = function() {
     return this._active;
 };
 
-Game_BattlerTS.prototype.move = function() {
-    return this._move;
-};
-
 Game_BattlerTS.prototype.requestImage = function() {
     return this._requestImage;
 };
@@ -1695,8 +1693,12 @@ Game_BattlerTS.prototype.updateActive = function() {
     this.active(this._event.isActive());
 };
 
-Game_BattlerTS.prototype.setMove = function(object) {
-    this._move = object.meta['move'] || TacticsSystem.movePoints || 5;
+Game_BattlerTS.prototype.data = function() {
+    return null;
+};
+
+Game_BattlerTS.prototype.tparam = function(paramString) {
+    return this.data().meta[paramString] || this.event().meta[paramString];
 };
 
 Game_BattlerTS.prototype.canPlay = function() {
@@ -1719,7 +1721,7 @@ Game_BattlerTS.prototype.defaultDirection = function() {
 };
 
 Game_BattlerTS.prototype.updateRange = function() {
-    this._event.tilesRange(this._move);
+    this._event.tilesRange(this.mvp);
 };
 
 Game_BattlerTS.prototype.moveStraightTo = function(x, y) {
@@ -1871,11 +1873,14 @@ Game_ActorTS.prototype.initialize = function(event, actorId) {
     Game_BattlerTS.prototype.initialize.call(this, event);
     this._actor = $gameActors.actor(actorId);
     this._actions = [];
-    this.setMove($dataActors[actorId]);
 };
 
 Game_ActorTS.prototype.battler = function() {
     return this._actor;
+};
+
+Game_ActorTS.prototype.data = function() {
+    return $dataActors[this._actor.actorId()];
 };
 
 Game_ActorTS.prototype.opponentsUnit = function() {
@@ -1968,21 +1973,18 @@ function Game_EnemyTS() {
 Game_EnemyTS.prototype = Object.create(Game_BattlerTS.prototype);
 Game_EnemyTS.prototype.constructor = Game_EnemyTS;
 
+Object.defineProperties(Game_EnemyTS.prototype, {
+    mvp: { get: function() { return this.tparam('agg') || TacticsSystem.agg; }, configurable: true }
+});
+
 Game_EnemyTS.prototype.initialize = function(event, enemyId) {
     Game_BattlerTS.prototype.initialize.call(this, event);
     this._enemy = new Game_Enemy(enemyId, 0, 0);
     this._char = new Game_Character();  // it's used to calculate the shortest path
-    this.setMove($dataEnemies[enemyId]);
-    this.setAggro($dataEnemies[enemyId], event);
 };
 
-Game_EnemyTS.prototype.setAggro = function(object, event) {
-    var meta = event.meta();
-    this._aggro = parseInt(meta['aggro']) || object.meta['aggro'] || this._move;
-};
-
-Game_EnemyTS.prototype.aggro = function() {
-    return this._aggro;
+Game_EnemyTS.prototype.data = function() {
+    return $dataEnemies[this._enemy.enemyId()];
 };
 
 Game_EnemyTS.prototype.battler = function() {
@@ -2033,9 +2035,9 @@ Game_EnemyTS.prototype.findTarget = function() {
 };
 
 Game_EnemyTS.prototype.findBestMove = function() {
-    this._event.tilesRange(this._aggro);
+    this._event.tilesRange(this.agg);
     var target = this.findTarget();
-    this._event.tilesRange(this._move);
+    this._event.tilesRange(this.mvp);
     var pos = new Point(this.x, this.y);
     this._char.setPosition(this.x, this.y);
     while (!this.isPosFound(this._char.x, this._char.y, pos, target)) {
@@ -3475,8 +3477,8 @@ Game_BattlerBase.prototype.isOccasionOk = function(item) {
 
 TacticsSystem.Game_Battler_makeActionTimes = Game_Battler.prototype.makeActionTimes;
 Game_Battler.prototype.makeActionTimes = function() {
-    //var actionTimes = this.battlerTS().move();
-    return TacticsSystem.Game_Battler_makeActionTimes.call(this) + 1;
+    var actionTimes = this.battlerTS().mvp;
+    return actionTimes + TacticsSystem.Game_Battler_makeActionTimes.call(this) + 1;
 };
 
 TacticsSystem.Game_Battler_initMembers = Game_Battler.prototype.initMembers;
@@ -3501,7 +3503,20 @@ Game_Battler.prototype.currentAction = function() {
 TacticsSystem.Game_Battler_clearActions = Game_Battler.prototype.clearActions;
 Game_Battler.prototype.clearActions = function() {
     TacticsSystem.Game_Battler_clearActions.call(this);
-    this._actionIndex = 0;
+    this.initActionIndex();
+};
+
+Game_Battler.prototype.initActionIndex = function() {
+     this.setActionIndex(0);
+};
+
+Game_Battler.prototype.setMoveActionIndex = function() {
+    var move = this.battlerTS().mvp;
+    this.setActionIndex(move);
+};
+
+Game_Battler.prototype.setActionIndex = function(actionIndex) {
+     this._actionIndex = actionIndex;
 };
 
 //-----------------------------------------------------------------------------
