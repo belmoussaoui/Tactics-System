@@ -95,16 +95,60 @@
  * @desc The wait command name to display in actor command window.
  * @default Wait
  *
+ * @param switches manager
+ * @default
+ *
+ * @param battle start id
+ * @parent switches manager
+ * @desc The switche id to set if the battle has started.
+ * @default 1
+ *
+ * @param player phase id
+ * @parent switches manager
+ * @desc The switche id to set if it's the player phase.
+ * @default 2
+ *
+ * @param enemy phase id
+ * @parent switches manager
+ * @desc The switche id to set if it's the enemy phase.
+ * @default 3
+ *
+ * @param variables manager
+ * @default
+ *
+ * @param current phase id
+ * @parent variables manager
+ * @desc The variable id to set the current phase.
+ * 1: startPhase, 2 : playerPhase, 3 : enemyPhase, 4 : battleEnd (can't to be use)
+ * @default 1
+ *
+ * @param current player phase id
+ * @parent variables manager
+ * @desc The variable id to set the sub phase of player.
+ * 1: explore, 2 : select, 3 : target
+ * @default 2
+ *
+ * @param current battle phase id
+ * @parent variables manager
+ * @desc The variable id to set the sub phase of player and enemy.
+ * 1: start, 2 : move, 3 : action, 4 : turnEnd (can't to be use)
+ * @default 3
+ *
+ * @param turn count id
+ * @parent variables manager
+ * @desc The variable id to set the turn count of battle.
+ * @default 4
+ *
  * @help
  *
  * For more information, please consult :
  *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system.97023/
  * Plugin Command:
- *   TS.battleProcessing [ON/OFF]  # Activate tactics system.
+ *   TS.battleProcessing [ON/OFF]  # Activate or desactivate the system.
  *   TS.battleWin                  # Proceed immediately to the victory of the battle.
  *   TS.battleLose                 # Proceed immediately to the defeat of the battle.
- *   TS.selectorMoveTo x y
- *   TS.selectorTransfer x y
+ *   TS.selectorMoveTo x y         # Move the selector to position x and y.
+ *   TS.selectorTransfer x y       # Move immediately the selector to position x and y.
  */
 
 // duration boss collapse actor
@@ -130,6 +174,13 @@ TacticsSystem.damageTerm =             String(TacticsSystem.Parameters['damage t
 TacticsSystem.hitRateTerm =            String(TacticsSystem.Parameters['hit rate term (abbr.)']);
 TacticsSystem.criticalRateTerm =       String(TacticsSystem.Parameters['critical rate term (abbr.)']);
 TacticsSystem.wait =                   String(TacticsSystem.Parameters['wait command name']);
+TacticsSystem.battleStartId =          Number(TacticsSystem.Parameters['battle start id']);
+TacticsSystem.playerPhaseId =          Number(TacticsSystem.Parameters['player phase id']);
+TacticsSystem.enemyPhaseId =           Number(TacticsSystem.Parameters['enemy phase id']);
+TacticsSystem.phaseVarId =             Number(TacticsSystem.Parameters['current phase id']);
+TacticsSystem.playerPhaseVarId =       Number(TacticsSystem.Parameters['current player phase id']);
+TacticsSystem.battlePhaseVarId =       Number(TacticsSystem.Parameters['current battle phase id']);
+TacticsSystem.turnCountVarId =         Number(TacticsSystem.Parameters['turn count id']);
 
 //-----------------------------------------------------------------------------
 // Scene_BattleTS
@@ -159,6 +210,7 @@ Scene_BattleTS.prototype.createDisplayObjects = function() {
     BattleManagerTS.setLogWindow(this._logWindow);
     BattleManagerTS.setSubjectWindow(this._subjectWindow);
     BattleManagerTS.setTargetWindow(this._targetWindow);
+    BattleManagerTS.setInfoWindow(this._infoWindow);
     BattleManagerTS.setSpriteset(this._spriteset);
     this._logWindow.setSpriteset(this._spriteset);
 };
@@ -387,7 +439,7 @@ Scene_BattleTS.prototype.commandEvent = function() {
 Scene_BattleTS.prototype.commandWait = function() {
     BattleManagerTS.inputtingAction().setWait();
     this._actorCommandWindow.close();
-    BattleManagerTS.processAction();
+    BattleManagerTS.setupAction();
 };
 
 Scene_BattleTS.prototype.selectPreviousCommand = function() {
@@ -566,6 +618,10 @@ BattleManagerTS.setTargetWindow = function(targetWindow) {
     this._targetWindow = targetWindow;
 };
 
+BattleManagerTS.setInfoWindow = function(infoWindow) {
+    this._infoWindow = infoWindow;
+};
+
 BattleManagerTS.setSpriteset = function(spriteset) {
     this._spriteset = spriteset;
 };
@@ -591,7 +647,7 @@ BattleManagerTS.startBattle = function() {
     $gameSystem.onBattleStart();
     $gamePartyTS.onBattleStart();
     $gameTroopTS.onBattleStart();
-    $gameSwitches.setValue(1, true);
+    $gameSwitches.setValue(TacticsSystem.battleStartId, true);
 };
 
 BattleManagerTS.isActive = function() {
@@ -851,6 +907,7 @@ BattleManagerTS.processTarget = function() {
     this._battlePhase = 'target';
 };
 
+// in selector
 BattleManagerTS.updateTarget = function() {
     if ($gameSelectorTS.isMoving()) {
         this.refreshTarget();
@@ -879,6 +936,7 @@ BattleManagerTS.previousTarget = function() {
     this._battlePhase = 'input';
     this.processCancel();
     this._targetWindow.close();
+    this._infoWindow.close();
 };
 
 BattleManagerTS.inputtingAction = function() {
@@ -900,10 +958,20 @@ BattleManagerTS.refreshTarget = function() {
     var select = $gameSelectorTS.select();
     if (select && select.isAlive()) {
         this._targetWindow.open(select);
-        //this.refreshInfoWindow();
+        this.refreshInfo();
     } else {
         this._targetWindow.close();
-        //this._informationWindow.close();
+        this._infoWindow.close();
+    }
+};
+
+BattleManagerTS.refreshInfo = function() {
+    var select = $gameSelectorTS.select();
+    var action = this.inputtingAction();
+    if (action.isTargetValid(select)) {
+        this._infoWindow.open(select);
+    } else {
+        this._infoWindow.close();
     }
 };
 
@@ -1005,15 +1073,23 @@ BattleManagerTS.processAction = function() {
 
 BattleManagerTS.endAction = function() {
     $gameSelectorTS.updateSelect();  // target is dead
+    $gameMap.eraseTiles();
+    $gameTemp.setCancel(true);
     var subject = this._subject;
     subject.onAllActionsEnd();
     this._logWindow.displayAutoAffectedStatus(subject);
     this._logWindow.displayCurrentState(subject);
     this._logWindow.displayRegeneration(subject);
-    $gameMap.eraseTiles();
+    this.closeAction();
+};
+
+BattleManagerTS.closeAction = function() {
+    this._battlePhase = 'start';
     this._subjectWindow.close();
     this._targetWindow.close();
-    this.endBattlePhase();
+    this._infoWindow.close();
+    this._subject.onTurnEnd();
+    this._subject = null;
 };
 
 BattleManagerTS.startAction = function() {
@@ -1043,6 +1119,8 @@ BattleManagerTS.updateAction = function() {
 BattleManagerTS.nextAction = function() {
     if (this._subject.nextAction() && this._subject.isActor()) {
         this.processCancel();
+        this._targetWindow.close();
+        this._infoWindow.close();
         this._battlePhase = 'input';
     } else {
         this.processAction();
@@ -1131,13 +1209,6 @@ BattleManagerTS.endEnemyPhase = function() {
     //this.makeAllyOrders();
 };
 
-BattleManagerTS.endBattlePhase = function() {
-    $gameTemp.setCancel(true);
-    this._battlePhase = 'start';
-    this._subject.onTurnEnd();
-    this._subject = null;
-};
-
 BattleManagerTS.setupCombat = function(action) {
     var gameFriends = action.friendsUnit();
     gameFriends.setupTS(action.combatFriendsUnit(this._subject));
@@ -1178,6 +1249,10 @@ BattleManagerTS.checkBattleEnd = function() {
 };
 
 BattleManagerTS.processVictory = function() {
+    // to change
+    this._subjectWindow.close();
+    this._targetWindow.close();
+    this._infoWindow.close();
     $gameSelectorTS.setTransparent(true);
     $gameParty.setupTS($gamePartyTS.members());
     $gameTroop.setupTS($gameTroopTS.members());
@@ -1331,7 +1406,7 @@ BattleManagerTS.onAllTurnEnd = function() {
 };
 
 BattleManagerTS.terminate = function() {
-    $gameSwitches.setValue(1, false);
+    $gameSwitches.setValue(TacticsSystem.battleStartId, false);
     $gamePlayer.setThrough(false);
     $gamePlayer.refresh();
 };
@@ -1611,7 +1686,7 @@ Game_SelectorTS.prototype.isTransparent = function() {
 };
 
 Game_SelectorTS.prototype.isBusy = function() {
-    return $gameMap.isDestinationValid() || $gameTemp.isDestinationValid();
+    return ($gameMap.isDestinationValid() || $gameTemp.isDestinationValid());
 };
 
 //-----------------------------------------------------------------------------
@@ -2810,7 +2885,7 @@ Sprite_StartTS.prototype.drawStart = function() {
     this.bitmap.outlineWidth = 4;
     this.bitmap.fontSize = 28;
     var text = $gameTroop.name()
-    this.bitmap.drawText(text, x, y + 50, maxWidth, 32, 'center');
+    this.bitmap.drawText(text, x, y + 56, maxWidth, 32, 'center');
     this.opacity = 255;
     this.show();
 };
@@ -2998,14 +3073,14 @@ Game_Switches.prototype.update = function() {
 };
 
 Game_Switches.prototype.updatePhase = function() {
-    this.setValue(2, false);
-    this.setValue(3, false);
+    this.setValue(TacticsSystem.playerPhaseId, false);
+    this.setValue(TacticsSystem.enemyPhaseId, false);
     switch (BattleManagerTS.phase()) {
     case 'playerPhase':
-        this.setValue(2, true);
+        this.setValue(TacticsSystem.playerPhaseId, true);
         break;
     case 'enemyPhase':
-        this.setValue(3, true);
+        this.setValue(TacticsSystem.enemyPhaseId, true);
         break
     }
 };
@@ -3017,8 +3092,8 @@ Game_Switches.prototype.updatePhase = function() {
 
 Game_Variables.prototype.update = function() {
     this.updatePhase();
-    this.updateBattlePhase();
     this.updatePlayerPhase();
+    this.updateBattlePhase();
     this.updateTurnCount();
 };
 
@@ -3041,7 +3116,25 @@ Game_Variables.prototype.updatePhase = function() {
         var value = 0;
         break;
     }
-    this.setValue(1, value);
+    this.setValue(TacticsSystem.phaseVarId, value);
+};
+
+Game_Variables.prototype.updatePlayerPhase = function() {
+    switch (BattleManagerTS.battlePhase()) {
+    case 'explore':
+        var value = 1;
+        break;
+    case 'select':
+        var value = 2;
+        break;
+    case 'target':
+        var value = 3;
+        break
+    default:
+        var value = 0;
+        break;
+    }
+    this.setValue(TacticsSystem.playerPhaseVarId, value);
 };
 
 Game_Variables.prototype.updateBattlePhase = function() {
@@ -3062,29 +3155,11 @@ Game_Variables.prototype.updateBattlePhase = function() {
         var value = 0;
         break;
     }
-    this.setValue(2, value);
-};
-
-Game_Variables.prototype.updatePlayerPhase = function() {
-    switch (BattleManagerTS.battlePhase()) {
-    case 'explore':
-        var value = 1;
-        break;
-    case 'select':
-        var value = 2;
-        break;
-    case 'target':
-        var value = 3;
-        break
-    default:
-        var value = 0;
-        break;
-    }
-    this.setValue(3, value);
+    this.setValue(TacticsSystem.battlePhaseVarId, value);
 };
 
 Game_Variables.prototype.updateTurnCount = function() {
-    this.setValue(4, $gameTroop.turnCount());
+    this.setValue(TacticsSystem.turnCountVarId, $gameTroop.turnCount());
 };
 
 //-----------------------------------------------------------------------------
@@ -3240,7 +3315,6 @@ Game_Action.prototype.isWait = function() {
 //
 // The superclass of Game_Battler. It mainly contains parameters calculation.
 
-
 TacticsSystem.Game_BattlerBase_canUse = Game_BattlerBase.prototype.canUse;
 Game_BattlerBase.prototype.canUse = function(item) {
     if ($gameParty.inBattle()) {
@@ -3388,7 +3462,7 @@ Game_Battler.prototype.isItemRangeOk = function(item) {
 
 Game_Battler.prototype.nextAction = function() {
     this._actionIndex++;
-    if (this._actionIndex < this.numActions() - 1) {
+    if (this._actionIndex < this.numActions()) {
         return true;
     } else {
         return false;
@@ -3774,12 +3848,6 @@ Game_Troop.prototype.name = function() {
     return this.troop().name;
 };
 
-TacticsSystem.Game_Troop_members = Game_Troop.prototype.members;
-Game_Troop.prototype.members = function() {
-    return $gamePartyTS.inBattle() ? $gameTroopTS.members() :
-           TacticsSystem.Game_Troop_members.call(this);
-};
-
 //-----------------------------------------------------------------------------
 // Game_Map
 //
@@ -4050,6 +4118,23 @@ Game_Interpreter.prototype.command301 = function() {
         SceneManager.push(Scene_BattleTS);
     }
     return res;
+};
+
+TacticsSystem.Game_Interpreter_iterateEnemyIndex = Game_Interpreter.prototype.iterateEnemyIndex;
+Game_Interpreter.prototype.iterateEnemyIndex = function(param, callback) {
+    if ($gameTroopTS.inBattle()) {
+        if (param < 0) {
+            $gameTroopTS.members().forEach(callback);
+        } else {
+            var enemy = $gameTroopTS.members()[param];
+            if (enemy) {
+                callback(enemy);
+            }
+        }
+    } else {
+        TacticsSystem.Game_Interpreter_iterateEnemyIndex.call(this, param, callback);
+    }
+
 };
 
 //-----------------------------------------------------------------------------
