@@ -1,13 +1,18 @@
 //=============================================================================
-// CombatScene.js v0.2
+// CombatScene.js v1.0
 //=============================================================================
 
 /*:
- * @plugindesc Add-on to display the combat animation scene for the TacticsSystem.
+ * @plugindesc Add-on to display the combat animation scene.
+ * Requires: TacticsSystem.js
  * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
 *
- * @param transition delay
- * @desc The transition delay to display the scene combat
+ * @param start transition delay
+ * @desc The transition delay to starting display the scene combat
+ * @default 30
+ *
+ * @param end transition delay
+ * @desc The transition delay to ending display the scene combat
  * @default 30
  *
  * @help
@@ -19,7 +24,8 @@
 var CombatScene = CombatScene || {};
 CombatScene.Parameters = PluginManager.parameters('CombatScene');
 
-CombatScene.transitionDelay = Number(CombatScene.Parameters['transition delay']);
+CombatScene.startTransitionDelay = Number(CombatScene.Parameters['start transition delay']);
+CombatScene.endTransitionDelay = Number(CombatScene.Parameters['end transition delay']);
 
 //-----------------------------------------------------------------------------
 // Scene_Combat
@@ -45,7 +51,6 @@ Scene_Combat.prototype.create = function() {
 Scene_Combat.prototype.start = function() {
     Scene_Base.prototype.start.call(this);
     this.startFadeIn(this.fadeSpeed(), false);
-    BattleManagerTS.processAction();
 };
 
 Scene_Combat.prototype.createDisplayObjects = function() {
@@ -64,6 +69,9 @@ Scene_Combat.prototype.createAllWindows = function() {
     this.createLogWindow();
     this.createStatusWindow();
     this.createMessageWindow();
+    if (BattleManagerTS._expWindow) {
+        this.addChild(BattleManagerTS._expWindow)
+    }
 };
 
 Scene_Combat.prototype.createLogWindow = function() {
@@ -94,21 +102,25 @@ Scene_Combat.prototype.update = function() {
     var active = this.isActive();
     $gameScreen.update();
     this.updateSubjectStatusWindow();
-    BattleManagerTS.update();
+    if (!BattleManagerTS._expWindow || !BattleManagerTS._expWindow.isOpen()) {
+        BattleManagerTS.update();
+    }
     Scene_Base.prototype.update.call(this);
 };
 
+Scene_Combat.prototype.isSceneChangeOk = function() {
+    return this.isActive() && !$gameMessage.isBusy();
+};
+
 Scene_Combat.prototype.updateSubjectStatusWindow = function() {
-    var select = BattleManagerTS.subjectTS();
-    var target = BattleManagerTS._target || $gameSelectorTS.select();
-    if (target) {
-        if (select.isActor()) {
-            this._statusSubjectWindow.open(select);
-            this._statusTargetWindow.open(target);
-        } else {
-            this._statusSubjectWindow.open(target);
-            this._statusTargetWindow.open(select);
-        }
+    var select = BattleManagerTS.subject();
+    var target = $gameSelectorTS.select();
+    if (select.isActor()) {
+        this._statusSubjectWindow.open(select);
+        this._statusTargetWindow.open(target);
+    } else {
+        this._statusSubjectWindow.open(target);
+        this._statusTargetWindow.open(select);
     }
 };
 
@@ -165,7 +177,7 @@ Scene_BattleTS.prototype.launchCombat = function() {
 };
 
 Scene_BattleTS.prototype.startEncounterEffect = function() {
-    this._waitCount = CombatScene.transitionDelay;
+    this._waitCount = CombatScene.startTransitionDelay;
 };
 
 Scene_BattleTS.prototype.updateEncounterEffect = function() {
@@ -187,35 +199,63 @@ CombatScene.BattleManagerTS_initMembers = BattleManagerTS.initMembers;
 BattleManagerTS.initMembers = function() {
     CombatScene.BattleManagerTS_initMembers.call(this);
     this._startCombat = false;
+    this._waitCount = 0;
 };
 
+CombatScene.BattleManagerTS_setupAction = BattleManagerTS.setupAction;
 BattleManagerTS.setupAction = function() {
-    var action = this.subject().currentAction();
-    if (action && action.isValid()) {
-        this.setupLocalBattle(action);
+    CombatScene.BattleManagerTS_setupAction.call(this);
+    var action = this._subject.currentAction();
+    if (action && action.isValid() && !action.isWait()) {
         var target = action.makeTargets()[0];
-        var friendsUnitTS = target.friendsUnitTS();
-        var battler = friendsUnitTS.getBattlerTS(target);
-        $gameSelectorTS.performTransfer(battler.x, battler.y);
+        $gameSelectorTS.performTransfer(target.x, target.y);
         this._startCombat = true;
-    } else {
-        this.processAction();
+        this._waitCount = CombatScene.endTransitionDelay;
     }
 };
 
-CombatScene.BattleManagerTS_endBattlePhase = BattleManagerTS.endBattlePhase
-BattleManagerTS.endBattlePhase = function() {
+CombatScene.BattleManagerTS_updateClose = BattleManagerTS.updateClose;
+BattleManagerTS.updateClose = function() {
+    if (!this.checkCombatEnd()) {
+        CombatScene.BattleManagerTS_updateClose.call(this);
+    }
+};
+
+BattleManagerTS.checkCombatEnd = function() {
     if (SceneManager.isPreviousScene(Scene_BattleTS)) {
         this._startCombat = false;
         $gameSelectorTS.savePosition();
         SceneManager.pop();
-    } else {
-        CombatScene.BattleManagerTS_endBattlePhase.call(this);
+        return true;
     }
+    return false;
 };
 
 BattleManagerTS.isStartCombat = function() {
     return this._startCombat;
+};
+
+BattleManagerTS.subject = function() {
+    return this._subject;
+};
+
+CombatScene.BattleManagerTS_nextAction = BattleManagerTS.nextAction;
+BattleManagerTS.nextAction = function() {
+    if (this._waitCount > 0) {
+        this._waitCount -= 1;
+    }
+    if (this._waitCount <= 0 && !this.checkCombatEnd()) {
+        CombatScene.BattleManagerTS_nextAction.call(this);
+    }
+};
+
+CombatScene.BattleManagerTS_checkBattleEnd = BattleManagerTS.checkBattleEnd;
+BattleManagerTS.checkBattleEnd = function() {
+    if (!SceneManager.isPreviousScene(Scene_BattleTS)) {
+        return CombatScene.BattleManagerTS_checkBattleEnd.call(this);
+    } else {
+        return false;
+    }
 };
 
 //-----------------------------------------------------------------------------
@@ -226,6 +266,16 @@ BattleManagerTS.isStartCombat = function() {
 
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
     TacticsSystem.Window_BattleLog_showNormalAnimation.call(this, targets, animationId, mirror);
+};
+
+TacticsSystem.Game_Battler_performCollapse = Game_Battler.prototype.performCollapse;
+Game_Battler.prototype.performCollapse = function() {
+    if ($gamePartyTS.inBattle()) { // $gameParty.inBattle
+        this.event().setThrough(true);
+        this.event().setTransparent(true);
+    } else {
+        TacticsSystem.Game_Battler_performCollapse.call(this);
+    }
 };
 
 //-----------------------------------------------------------------------------
@@ -254,4 +304,9 @@ Sprite_Enemy.prototype.setHomeEnemy = function(index) {
 
 Sprite_Enemy.prototype.setHomeEnemySideView = function(index) {
     this.setHome(200 - index * 32, 280 + index * 96);
+};
+
+// problème
+Game_SelectorTS.prototype.isBusy = function() {
+    return (false);
 };

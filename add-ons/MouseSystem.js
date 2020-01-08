@@ -1,9 +1,10 @@
 //=============================================================================
-// MouseSystem.js v0.2
+// MouseSystem.js v0.2.1
 //=============================================================================
 
 /*:
- * @plugindesc Add features for control with the mouse for the TacticsSystem.
+ * @plugindesc Add features for control with the mouse.
+ * Requires: TacticsSystem.js.
  * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
  *
  * @help
@@ -151,6 +152,23 @@ TouchInput.isActive = function() {
 };
 
 //-----------------------------------------------------------------------------
+// Scene_BattleTS
+//
+// The scene class of the battle tactics system screen.
+
+Scene_BattleTS.prototype.isMapTouchOk = function() {
+    return false;
+};
+
+MouseSystem.Scene_BattleTS_updateBattleProcess = Scene_BattleTS.prototype.updateBattleProcess;
+Scene_BattleTS.prototype.updateBattleProcess = function() {
+    if (!this.isAnyInputWindowActive() || BattleManagerTS.isBattleEnd()) {
+        $gameSelectorTS.updateMoveByMouse();
+    }
+    MouseSystem.Scene_BattleTS_updateBattleProcess.call(this);
+};
+
+//-----------------------------------------------------------------------------
 // BattleManagerTS
 //
 // The static class that manages battle progress.
@@ -168,7 +186,7 @@ BattleManagerTS.updateMove = function() {
 //
 // The game object class for the selector.
 
-Game_SelectorTS.prototype.moveByDestination = function() {
+Game_SelectorTS.prototype.updateMoveByMouse = function() {
     if (this.canMove() && TouchInput.isActive()) {
         this._x = $gameMap.canvasToMapX(TouchInput.currentX);
         this._y = $gameMap.canvasToMapY(TouchInput.currentY);
@@ -178,14 +196,16 @@ Game_SelectorTS.prototype.moveByDestination = function() {
 };
 
 Game_SelectorTS.prototype.updateScroll = function(lastScrolledX, lastScrolledY) {
-    var x1 = lastScrolledX;
-    var y1 = lastScrolledY;
-    var x2 = this.scrolledX();
-    var y2 = this.scrolledY();
-    if (TouchInput.isActive()) {
-        this.updateScrollTouch();
-    } else {
-        this.updateScrollInput(x1, y1, x2, y2);
+    if (this.canMove()) {
+        var x1 = lastScrolledX;
+        var y1 = lastScrolledY;
+        var x2 = this.scrolledX();
+        var y2 = this.scrolledY();
+        if (TouchInput.isActive()) {
+            this.updateScrollTouch();
+        } else {
+            this.updateScrollInput(x1, y1, x2, y2);
+        }
     }
 };
 
@@ -219,8 +239,13 @@ Game_SelectorTS.prototype.updateScrollInput = function(x1, y1, x2, y2) {
     }
 };
 
+MouseSystem.Game_SelectorTS_canMove = Game_SelectorTS.prototype.canMove;
 Game_SelectorTS.prototype.canMove = function() {
-    return !$gameMap.isEventRunning() && !$gameMessage.isBusy() && !BattleManagerTS.isInputting();
+    return MouseSystem.Game_SelectorTS_canMove.call(this) && BattleManagerTS.isActive();
+};
+
+Game_SelectorTS.prototype.triggerTouchAction = function() {
+    return TouchInput.isTriggered();
 };
 
 //-----------------------------------------------------------------------------
@@ -253,7 +278,9 @@ Window_Selectable.prototype.processTouch = function() {
             }
         }
         if (this.isTouchedInsideFrame()) {
-            this.onTouch(false);
+            if (TouchInput.isActive()) {
+                this.onTouch(false);
+            }
         }
     } else {
         this._touching = false;
