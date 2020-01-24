@@ -1,4 +1,4 @@
-# Tactics System v.0.6
+# Tactics System v.1.0
 
 This document is a user guide to quickly configure the Tactics System in a new project. Please read the instructions carefully before using this system. The Tactics System is a tactical battle system for RPG Maker MV inspired by Final Fantasy Tactics and the Fire Emblem series.
 
@@ -7,7 +7,7 @@ This document is a user guide to quickly configure the Tactics System in a new p
 ## Prepare Yourself !
 The **Tactics System** allows the creation of tactical-RPG with **RPG Maker MV**  (v.1.6.2)  software. **The Tactics System has been designed to be easy to use**. Just create a map with events defining the position of units and use battle processing event command to launch a fight !
 
-An example demo of how to use the system is provided [in the forum](https://forums.rpgmakerweb.com/index.php?forums/js-plugins-in-development.137/) [outated !]. The Tactics System will be updated regularly, so please check the forum regularly.
+An example demo of how to use the system is provided [in the forum](https://forums.rpgmakerweb.com/index.php?forums/js-plugins-in-development.137/) [outated !].
 
 ## System Flow
 The fight proceeds in the same way as an episode of the series Fire Emblem : we have the **player phase** and the **enemy phase**.
@@ -42,8 +42,10 @@ We need to bind the events to the actors and enemies in the database. The bond o
 |`TS.loseBattle`| Proceed immediately to the defeat of the battle.
 |`TS.selectorMoveTo x y`|Move the selector to position x and y.
 |`TS.selectorTransfer x y` | Move immediately the selector to position x and y.
+|`TS.selectorEvent eventId` |  Move immediately the selector to position at event of eventId.
+|`TS.clearAll [ON/OFF]` |  Activate or desactivate clear all condition victory.
 
-> Other plugin commands should be added soon.
+> Other plugin commands should be added.
 
 # Database
 ## Actors, Classes and Enemies
