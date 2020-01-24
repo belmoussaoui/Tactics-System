@@ -16,6 +16,14 @@
  * @desc The start battle term.
  * @default Start Battle
  *
+ * @param start battle term
+ * @desc The start battle term.
+ * @default Start Battle
+ *
+ * @param preparation phase id
+ * @desc The switch id to set if it's the preparation phase.
+ * @default 4
+ *
  * @help
  *
  * For more information, please consult :
@@ -25,8 +33,9 @@
 var BattlePreparation = BattlePreparation || {};
 BattlePreparation.Parameters = PluginManager.parameters('BattlePreparation');
 
-BattlePreparation.startScopeColor = String(BattlePreparation.Parameters['start scope color']);
-BattlePreparation.startBattleTerm = String(BattlePreparation.Parameters['start battle term']);
+BattlePreparation.startScopeColor =    String(BattlePreparation.Parameters['start scope color']);
+BattlePreparation.startBattleTerm =    String(BattlePreparation.Parameters['start battle term']);
+BattlePreparation.preparationPhaseId = Number(BattlePreparation.Parameters['preparation phase id']);
 
 BattlePreparation.Scene_BattleTS_start = Scene_BattleTS.prototype.start;
 Scene_BattleTS.prototype.start = function() {
@@ -120,6 +129,12 @@ Scene_BattleTS.prototype.onFormationCancel = function() {
         this._statusWindow2.hide();
         this._mapWindow.activate();
     }
+    var select = $gameSelectorTS.select();
+    if (select && select.isAlive()) {
+        this._subjectWindow.open(select);
+    } else {
+        this._subjectWindow.close();
+    }
 };
 
 Scene_BattleTS.prototype.isAnyInputWindowActive = function() {
@@ -161,6 +176,9 @@ BattleManagerTS.createGameObjects = function() {
     if (isBattlePreparation) {
         this._phase = 'preparationPhase';
         this._battlePhase = 'explore';
+        $gameSelectorTS.setTransparent(false);
+        $gameTroopTS.onTurnStart();
+        $gamePartyTS.onTurnStart();
     }
     $gamePartyTS.setupMembers();
 };
@@ -281,15 +299,13 @@ BattleManagerTS.refreshSubstitute = function() {
     }
 };
 
-Game_SelectorTS.prototype.updateSelect = function() {
-    this._selectIndex = -1;
-    for (var i = 0; i < this.battlers().length; i++) {
-        var battler = this.battlers()[i];
-        if (battler && this.pos(battler.x, battler.y)) {
-            if (battler.isAlive()) {
-                this._selectIndex = i;
-            }
-        }
+BattlePreparation.BattleManagerTS_updateEvent = BattleManagerTS.updateEvent;
+BattleManagerTS.updateEvent = function() {
+    BattlePreparation.BattleManagerTS_updateEvent.call(this);
+    switch (this._phase) {
+    case 'preparationPhase':
+        $gameSwitches.update();
+        $gameVariables.update();
     }
 };
 
@@ -520,7 +536,6 @@ Window_FormationTS.prototype.drawItemImage = function(index) {
         this.changePaintOpacity(actor.isBattleMember());
         this.drawActorFace(actor, rect.x + 1, rect.y + 1, Window_Base._faceWidth, Window_Base._faceHeight);
         this.changePaintOpacity(true);
-
     }
 };
 
@@ -565,6 +580,23 @@ Game_Map.prototype.isOnStartTiles = function(x, y) {
 
 Game_Map.prototype.setStartColor = function() {
     this._color = TacticsSystem.moveScopeColor;
+};
+
+
+//-----------------------------------------------------------------------------
+// Game_Switches
+//
+// The game object class for switches.
+
+BattlePreparation.Game_Switches_updatePhase = Game_Switches.prototype.updatePhase;
+Game_Switches.prototype.updatePhase = function() {
+    BattlePreparation.Game_Switches_updatePhase.call(this);
+    this.setValue(BattlePreparation.preparationPhaseId, false);
+    switch (BattleManagerTS.phase()) {
+    case 'preparationPhase':
+        this.setValue(BattlePreparation.preparationPhaseId, true);
+        break;
+    }
 };
 
 //-----------------------------------------------------------------------------

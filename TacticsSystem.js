@@ -164,6 +164,8 @@
  *   TS.battleLose                 # Proceed immediately to the defeat of the battle.
  *   TS.selectorMoveTo x y         # Move the selector to position x and y.
  *   TS.selectorTransfer x y       # Move immediately the selector to position x and y.
+ *   TS.selectorEvent eventId     # Move immediately the selector to position at event of eventId.
+ *   TS.clearAll [ON/OFF]          # Activate or desactivate clear all condition victory.
  */
 
 var TacticsSystem = TacticsSystem || {};
@@ -389,7 +391,13 @@ Scene_BattleTS.prototype.start = function() {
     BattleManagerTS.startBattle();
     this.menuCalling = false;
     this._statusWindow.refresh();
-    // loadfacesetenemy;
+    this.loadFacesetEnemy();
+};
+
+Scene_BattleTS.prototype.loadFacesetEnemy = function() {
+    $gameTroopTS.members().forEach(function(member) {
+        ImageManager.loadEnemy(member.battlerName());
+    });
 };
 
 Scene_BattleTS.prototype.update = function() {
@@ -672,20 +680,20 @@ BattleManagerTS.initMembers = function() {
     this._canEscape = false;
     this._canLose = false;
     this._eventCallback = null;
-    this._preemptive = false;  // to do
-    this._surprise = false;  // to do
+    this._preemptive = false;
+    this._surprise = false;
     this._actorIndex = -1;
-    this._actionForcedBattler = null;  // to do
-    this._actionBattlers = [];  // to do
+    this._actionForcedBattler = null;
+    this._actionBattlers = [];
     this._subject = null;
-    this._action = null;  // to do
+    this._action = null;
     this._targets = [];
     this._logWindow = null;
     this._subjectWindow = null;
     this._targetWindow = null;
     this._spriteset = null;
-    this._escapeRatio = 0;  // to do
-    this._escaped = false;  // to do
+    this._escapeRatio = 0;
+    this._escaped = false;
     this._rewards = {};
     this._turnForced = false;
 };
@@ -951,7 +959,7 @@ BattleManagerTS.updateStartPhase = function() {
     this._logWindow.startTurn();
     this._phase = 'playerPhase';
     this._battlePhase = 'start';
-        // other solution ?
+    // other solution ?
     // use battle log ?
     if ($gameTroopTS.needDisplayStart()) {
         $gameTroopTS.setNeedStart(false);
@@ -961,7 +969,7 @@ BattleManagerTS.updateStartPhase = function() {
     this.refreshMoveTiles();
 };
 
-// in selector
+// in game selectorTS
 BattleManagerTS.updateExplore = function() {
     this.refreshSubject();
     if ($gameSelectorTS.isMoving()) {
@@ -997,7 +1005,7 @@ BattleManagerTS.selectActor = function() {
     this.refreshMoveTiles();
 };
 
-// in selector
+// in game selectorTS
 BattleManagerTS.updateSelect = function() {
     var x = $gameSelectorTS.x;
     var y = $gameSelectorTS.y;
@@ -1027,13 +1035,19 @@ BattleManagerTS.previousSelect = function() {
     this.refreshMoveTiles();
     this._subject = null;
     $gameSelectorTS.updateSelect();
+    var select = $gameSelectorTS.select();
+    if (select && select.isAlive()) {
+        this._subjectWindow.open(select);
+    } else {
+        this._subjectWindow.close();
+    }
 };
 
 BattleManagerTS.processTarget = function() {
     this._battlePhase = 'target';
 };
 
-// in selector
+// in game selectorTS
 BattleManagerTS.updateTarget = function() {
     if ($gameSelectorTS.isMoving()) {
         this.refreshTarget();
@@ -1225,7 +1239,7 @@ BattleManagerTS.updateClose = function() {
     this._subjectWindow.close();
     this._targetWindow.close();
     this._infoWindow.close();
-    this._subject.onTurnEnd();
+    this._subject.onActionEnd();
     this._subject = null;
 };
 
@@ -1245,7 +1259,7 @@ BattleManagerTS.updateAction = function() {
     var target = this._targets.shift();
     if (target) {
         $gameSelectorTS.performTransfer(target.x, target.y);
-        this.turnTowardCharacter(target);
+        //this.turnTowardCharacter(target);
         this.invokeAction(this._subject, target);
     } else {
         this._logWindow.endAction(this._subject);
@@ -1324,6 +1338,7 @@ BattleManagerTS.endPlayerPhase = function() {
     this._phase = 'enemyPhase';
     this._battlePhase = 'start';
     $gameTroopTS.members().forEach(function(enemy) {
+        enemy.onTurnEnd();
         this._logWindow.displayAutoAffectedStatus(enemy);
         this._logWindow.displayRegeneration(enemy);
     }, this);
@@ -1337,6 +1352,7 @@ BattleManagerTS.endEnemyPhase = function() {
     this._phase = 'startPhase';
     this._battlePhase = 'start';
     $gamePartyTS.members().forEach(function(actor) {
+        actor.onTurnEnd();
         this._logWindow.displayAutoAffectedStatus(actor);
         this._logWindow.displayRegeneration(actor);
     }, this);
@@ -1967,7 +1983,7 @@ Game_PartyTS.prototype.restrictedMembers = function() {
 
 Game_PartyTS.prototype.onAllTurnEnd = function() {
     this.aliveMembers().forEach(function(actor) {
-        actor.onTurnEnd();
+        actor.onActionEnd();
     });
 };
 
@@ -3489,6 +3505,9 @@ Game_Action.prototype.combatFriendsUnit = function(battler) {
 Game_Action.prototype.searchBattlers = function(battler, units) {
     var battlers = [];
     var item = this.item();
+    if (this.isAttackRange(battler)) {
+        item = battler.weapons()[0] || battler.weapons()[1];
+    }
     this.updateRange(item, battler.tx, battler.ty);
     for (var i = 0; i < this._range.length; i++) {
         var redCell = this._range[i];
@@ -3501,6 +3520,10 @@ Game_Action.prototype.searchBattlers = function(battler, units) {
         }
     }
     return battlers;
+};
+
+Game_Action.prototype.isAttackRange = function (subject) {
+    return subject.isActor() && this.isAttack() && !subject.hasNoWeapons();
 };
 
 Game_Action.prototype.updateRange = function(item, x, y) {
@@ -3718,14 +3741,10 @@ Game_Battler.prototype.onTurnStart = function() {
     this.makeMoves();
 };
 
-TacticsSystem.Game_Battler_onTurnEnd = Game_Battler.prototype.onTurnEnd;
-Game_Battler.prototype.onTurnEnd = function() {
-    TacticsSystem.Game_Battler_onTurnEnd.call(this);
-    if ($gamePartyTS.inBattle()) {
-        this._canAction = false;
-        this.event().setDirection(2);
-        this.event().setStepAnime(false);
-    }
+Game_Battler.prototype.onActionEnd = function() {
+    this._canAction = false;
+    this.event().setDirection(2);
+    this.event().setStepAnime(false);
 };
 
 Game_Battler.prototype.isMoving = function() {
@@ -3862,11 +3881,6 @@ Game_Battler.prototype.makeShortestMoves = function() {
 Game_Battler.prototype.tpos = function() {
     return this.tx === this._char.x && this.ty === this._char.y;
 }
-
-TacticsSystem.Game_Battler_canMove = Game_Battler.prototype.canMove;
-Game_Battler.prototype.canMove = function() {
-    return TacticsSystem.Game_Battler_canMove.call(this) && this.canAction();
-};
 
 Game_Battler.prototype.canAction = function() {
     return $gamePartyTS.inBattle() ? this._canAction : true;
@@ -4050,7 +4064,7 @@ Game_Actor.prototype.isBattleMember = function() {
 
 Object.defineProperties(Game_Enemy.prototype, {
     // AGGressivity
-    agg: { get: function() { return this.tparam('agg') || TacticsSystem.mvp; }, configurable: true }
+    agg: { get: function() { return this.tparam('agg') || 99; }, configurable: true }
 });
 
 Game_Enemy.prototype.currentBattler = function() {
