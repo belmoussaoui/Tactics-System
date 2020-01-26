@@ -157,15 +157,15 @@
  * @help
  *
  * For more information, please consult :
- *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system.97023/
+ *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system-1-0.117600/
  * Plugin Command:
- *   TS.battleProcessing [ON/OFF]  # Activate or desactivate the system.
- *   TS.battleWin                  # Proceed immediately to the victory of the battle.
- *   TS.battleLose                 # Proceed immediately to the defeat of the battle.
- *   TS.selectorMoveTo x y         # Move the selector to position x and y.
- *   TS.selectorTransfer x y       # Move immediately the selector to position x and y.
+ *   TS.battleProcessing [ON/OFF] # Activate or desactivate the system.
+ *   TS.battleWin                 # Proceed immediately to the victory of the battle.
+ *   TS.battleLose                # Proceed immediately to the defeat of the battle.
+ *   TS.selectorMoveTo x y        # Move the selector to position x and y.
+ *   TS.selectorTransfer x y      # Move immediately the selector to position x and y.
  *   TS.selectorEvent eventId     # Move immediately the selector to position at event of eventId.
- *   TS.clearAll [ON/OFF]          # Activate or desactivate clear all condition victory.
+ *   TS.clearAll [ON/OFF]         # Activate or desactivate clear all condition victory.
  */
 
 var TacticsSystem = TacticsSystem || {};
@@ -3633,6 +3633,17 @@ Game_Action.prototype.isWait = function() {
     return this.item() === $dataSkills[this.subject().waitSkillId()];
 };
 
+TacticsSystem.Game_Action_subject = Game_Action.prototype.subject;
+Game_Action.prototype.subject = function() {
+    TacticsSystem.Game_Action_subject.call(this);
+    if ($gamePartyTS.inBattle()) {
+        if (this._subjectActorId <= 0) {
+            return $gameTroopTS.members()[this._subjectEnemyIndex];
+        }
+    }
+    return TacticsSystem.Game_Action_subject.call(this);
+};
+
 //-----------------------------------------------------------------------------
 // Game_BattlerBase
 //
@@ -3770,7 +3781,9 @@ Game_Battler.prototype.isItemRangeValid = function(item) {
 Game_Battler.prototype.isSkillRangeOk = function(item) {
     var action = new Game_Action(this);
     action.setSkill(item.id);
-    if (action.isForOpponent()) {
+    if (this.isConfused()) {
+        return this.isConfusedRangeOk(action);
+    } if (action.isForOpponent()) {
         return action.combatOpponentsUnit(this).length > 0;
     }
     if (action.isForFriend()) {
@@ -3841,6 +3854,9 @@ Game_Battler.prototype.makeMoves = function() {
             this._moves.push(new Game_Action(this));
         }
     }
+    if (this.isRestricted()) {
+        this.makeConfusionMove()
+    }
 };
 
 Game_Battler.prototype.makeMoveTimes = function() {
@@ -3893,21 +3909,23 @@ Game_Battler.prototype.makeRange = function() {
 Game_Battler.prototype.makeConfusionMove = function() {
     var action = new Game_Action(this);
     action.setConfusion();
-    var target = [new Point(this.x, this.y)];
+    $gameMap.makeRange(this.mvp, this.event());
+    var targets = [new Point(this.x, this.y)];
     for (var i = 0; i < $gameMap.tiles().length; i++) {
-        var temp = $gameMap.tiles()[i];
-        this._x = temp.x;
-        this._y = temp.y;
-        if (this.canUse(action.item()) && this.isConfusedRangeOk(action)) {
-            if ($gameMap.eventsXy(this._x, this._y).length === 0) {
-                target.push(new Point(this.x, this.y));
+        var tile = $gameMap.tiles()[i];
+        this._tx = $gameMap.positionTileX(tile);
+        this._ty = $gameMap.positionTileY(tile);
+        if (this.canUse(action.item())) {
+            // actor can't use action in another actor
+            if ($gameMap.eventsXy(this.tx, this.ty).length === 0) {
+                targets.push(new Point(this.tx, this.ty));
             }
         }
     }
-    target = target[Math.floor(Math.random() * target.length)];
-    this._x = target.x;
-    this._y = target.y;
-    return target;
+    $gameMap.eraseTiles();
+    var target = targets[Math.randomInt(targets.length)];
+    this._tx = target.x;
+    this._ty = target.y;
 };
 
 Game_Battler.prototype.isConfusedRangeOk = function(action) {
@@ -3916,9 +3934,9 @@ Game_Battler.prototype.isConfusedRangeOk = function(action) {
         return action.combatOpponentsUnit(this).length > 0;
     case 2:
         return action.combatOpponentsUnit(this).length > 0 ||
-            action.battleFriendsUnit(this).length > 1;  // don't count self
+            action.combatFriendsUnit(this).length > 1;  // don't count self
     default:
-        return action.battleFriendsUnit(this).length > 1;
+        return action.combatFriendsUnit(this).length > 1;
     }
 };
 
@@ -4059,7 +4077,7 @@ Game_Actor.prototype.isBattleMember = function() {
 
 Game_Actor.prototype.makeMoves = function() {
     Game_Battler.prototype.makeMoves.call(this);
-    if (this.isAutoBattle()) {
+    if (!this.isRestricted() && this.isAutoBattle()) {
         this.autoMoves();
     }
 };
@@ -4119,7 +4137,9 @@ Game_Enemy.prototype.opponentsUnitTS = function() {
 
 Game_Enemy.prototype.makeMoves = function() {
     Game_Battler.prototype.makeMoves.call(this);
-    this.findAction();
+    if (!this.isConfused()) {
+        this.findAction();
+    }
     this.makeShortestMoves();
 };
 
@@ -4157,6 +4177,15 @@ Game_Enemy.prototype.applyMove = function() {
     var action = this.currentMove();
     if (action) {
         action.applyMove();
+    }
+};
+
+TacticsSystem.Game_Enemy_index = Game_Enemy.prototype.index;
+Game_Enemy.prototype.index = function() {
+    if ($gamePartyTS.inBattle()) {
+        return $gameTroopTS.members().indexOf(this)
+    } else {
+        return TacticsSystem.Game_Enemy_index.call(this);
     }
 };
 
