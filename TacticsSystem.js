@@ -1187,7 +1187,7 @@ BattleManagerTS.updateMove = function() {
             this._subject.nextMove();
         }
         if (!action || !action.isMove()){
-            if (this._subject.isActor() && !this._subject.isRestricted()) {
+            if (this._subject.isActor() && !this._subject.isRestricted() && !this._subject.isAutoBattle()) {
                 var x = this._subject.tx;
                 var y = this._subject.ty;
                 $gameSelectorTS.performTransfer(x, y);
@@ -1268,7 +1268,7 @@ BattleManagerTS.updateAction = function() {
 };
 
 BattleManagerTS.nextAction = function() {
-    if (this._subject.nextAction() && this._subject.isActor()) {
+    if (this._subject.nextAction() && this._subject.isActor() && !this._subject.isAutoBattle()) {
         this.processCancel();
         this._targetWindow.close();
         this._infoWindow.close();
@@ -1977,7 +1977,7 @@ Game_PartyTS.prototype.allMembers = function() {
 
 Game_PartyTS.prototype.restrictedMembers = function() {
     return this.members().filter(function(member) {
-        return member.isRestricted() && member.isAlive();
+        return (member.isRestricted() || member.isAutoBattle()) && member.isAlive();
     }, this);
 };
 
@@ -4055,6 +4055,43 @@ Game_Actor.prototype.isBattleMember = function() {
     } else {
         return TacticsSystem.Game_Actor_isBattleMember.call(this);
     }
+};
+
+Game_Actor.prototype.makeMoves = function() {
+    Game_Battler.prototype.makeMoves.call(this);
+    if (this.isAutoBattle()) {
+        this.autoMoves();
+    }
+};
+
+Game_Actor.prototype.autoMoves = function() {
+    this.makeAutoBattleMoves();
+    this.makeShortestMoves();
+};
+
+Game_Actor.prototype.makeAutoBattleMoves = function() {
+    var saveX = this.tx;
+    var saveY = this.ty;
+    $gameMap.makeRange(16, this.event());
+    var maxValue = Number.MIN_VALUE;
+    for (var i = 0; i < $gameMap.tiles().length; i++) {
+        var tile = $gameMap.tiles()[i];
+        this._tx = $gameMap.positionTileX(tile);
+        this._ty = $gameMap.positionTileY(tile);
+        var list = this.makeActionList();
+        var value = 0;
+        for (var j = 0; j < list.length; j++) {
+            value += list[j].evaluate();
+        }
+        if (value > maxValue) {
+            maxValue = value;
+            saveX = this.tx;
+            saveY = this.ty;
+        }
+    }
+    $gameMap.eraseTiles();
+    this._tx = saveX;
+    this._ty = saveY;
 };
 
 //-----------------------------------------------------------------------------
