@@ -4501,7 +4501,11 @@ Game_Event.prototype.battler = function() {
 };
 
 Game_Event.prototype.tparam = function(paramString) {
-    return this.event().meta[paramString];
+    var param = this.event().meta[paramString];
+    if (typeof param === 'string') {
+        param = param.replace(/\s/g, '');
+    }
+    return param
 };
 
 TacticsSystem.Game_Event_isCollidedWithEvents = Game_Event.prototype.isCollidedWithEvents;
