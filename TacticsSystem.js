@@ -4029,7 +4029,8 @@ Game_Actor.prototype.checkEventsTriggerHere = function(x, y) {
         var events = $gameMap.eventsXy(x, y);
         for (var i = 0; i < events.length; i++) {
             var event = events[i];
-            if (event.isTriggerIn([0])) {
+            var list = event.list();
+            if (event.isTriggerIn([0]) && list && list.length > 1) {
                 this._actionsButton.push(event.eventId());
             }
         }
