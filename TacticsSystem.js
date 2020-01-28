@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v1.0
+// TacticsSystem.js v1.0.1
 //=============================================================================
 
 /*:
@@ -3644,6 +3644,15 @@ Game_Action.prototype.subject = function() {
     return TacticsSystem.Game_Action_subject.call(this);
 };
 
+TacticsSystem.Game_Action_setSubject = Game_Action.prototype.setSubject;
+Game_Action.prototype.setSubject = function(subject) {
+    TacticsSystem.Game_Action_setSubject.call(this, subject);
+    // For enemy restriction attack an ally...
+    if (!subject.isActor()) {
+        this._subjectEnemyIndex = $gameTroopTS.members().indexOf(subject);
+    }
+};
+
 //-----------------------------------------------------------------------------
 // Game_BattlerBase
 //
@@ -4178,15 +4187,6 @@ Game_Enemy.prototype.applyMove = function() {
     var action = this.currentMove();
     if (action) {
         action.applyMove();
-    }
-};
-
-TacticsSystem.Game_Enemy_index = Game_Enemy.prototype.index;
-Game_Enemy.prototype.index = function() {
-    if ($gamePartyTS.inBattle()) {
-        return $gameTroopTS.members().indexOf(this)
-    } else {
-        return TacticsSystem.Game_Enemy_index.call(this);
     }
 };
 

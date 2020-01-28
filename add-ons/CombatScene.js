@@ -1,5 +1,5 @@
 //=============================================================================
-// CombatScene.js v1.0
+// CombatScene.js
 //=============================================================================
 
 /*:
@@ -18,14 +18,14 @@
  * @help
  *
  * For more information, please consult :
- *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system.97023/
+ *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system-1-0.117600/
  */
 
 var CombatScene = CombatScene || {};
 CombatScene.Parameters = PluginManager.parameters('CombatScene');
 
 CombatScene.startTransitionDelay = Number(CombatScene.Parameters['start transition delay']);
-CombatScene.endTransitionDelay = Number(CombatScene.Parameters['end transition delay']);
+CombatScene.endTransitionDelay =   Number(CombatScene.Parameters['end transition delay']);
 
 //-----------------------------------------------------------------------------
 // Scene_Combat
@@ -259,6 +259,35 @@ BattleManagerTS.checkBattleEnd = function() {
 };
 
 //-----------------------------------------------------------------------------
+// Game_SelectorTS
+//
+// The game object class for the selector.
+
+CombatScene.Game_SelectorTS_isBusy = Game_SelectorTS.prototype.isBusy;
+Game_SelectorTS.prototype.isBusy = function() {
+    if (SceneManager.isPreviousScene(Scene_BattleTS)) {
+        return false
+    }
+    return CombatScene.Game_SelectorTS_isBusy.call(this);
+};
+
+//-----------------------------------------------------------------------------
+// Game_Battler
+//
+// The superclass of Game_Actor and Game_Enemy. It contains methods for sprites
+// and actions.
+
+CombatScene.Game_Battler_performCollapse = Game_Battler.prototype.performCollapse;
+Game_Battler.prototype.performCollapse = function() {
+    if ($gamePartyTS.inBattle()) {
+        this.event().setThrough(true);
+        this.event().setTransparent(true);
+    } else {
+        CombatScene.Game_Battler_performCollapse.call(this);
+    }
+};
+
+//-----------------------------------------------------------------------------
 // Window_BattleLog
 //
 // The window for displaying battle progress. No frame is displayed, but it is
@@ -266,16 +295,6 @@ BattleManagerTS.checkBattleEnd = function() {
 
 Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, mirror) {
     TacticsSystem.Window_BattleLog_showNormalAnimation.call(this, targets, animationId, mirror);
-};
-
-TacticsSystem.Game_Battler_performCollapse = Game_Battler.prototype.performCollapse;
-Game_Battler.prototype.performCollapse = function() {
-    if ($gamePartyTS.inBattle()) { // $gameParty.inBattle
-        this.event().setThrough(true);
-        this.event().setTransparent(true);
-    } else {
-        TacticsSystem.Game_Battler_performCollapse.call(this);
-    }
 };
 
 //-----------------------------------------------------------------------------
@@ -286,10 +305,11 @@ Game_Battler.prototype.performCollapse = function() {
 CombatScene.Sprite_Enemy_setBattler = Sprite_Enemy.prototype.setBattler 
 Sprite_Enemy.prototype.setBattler = function(battler) {
     CombatScene.Sprite_Enemy_setBattler.call(this, battler);
+    var index = battler.index();
     if (!$gameSystem.isSideView()) {
-        this.setHomeEnemy(battler.index());
+        this.setHomeEnemy(index);
     } else {
-        this.setHomeEnemySideView(battler.index())
+        this.setHomeEnemySideView(index);
     }
 };
 
@@ -304,9 +324,4 @@ Sprite_Enemy.prototype.setHomeEnemy = function(index) {
 
 Sprite_Enemy.prototype.setHomeEnemySideView = function(index) {
     this.setHome(200 - index * 32, 280 + index * 96);
-};
-
-// problème
-Game_SelectorTS.prototype.isBusy = function() {
-    return (false);
 };
