@@ -271,22 +271,6 @@ Game_SelectorTS.prototype.isBusy = function() {
 };
 
 //-----------------------------------------------------------------------------
-// Game_Battler
-//
-// The superclass of Game_Actor and Game_Enemy. It contains methods for sprites
-// and actions.
-
-CombatScene.Game_Battler_performCollapse = Game_Battler.prototype.performCollapse;
-Game_Battler.prototype.performCollapse = function() {
-    if ($gamePartyTS.inBattle()) {
-        this.event().setThrough(true);
-        this.event().setTransparent(true);
-    } else {
-        CombatScene.Game_Battler_performCollapse.call(this);
-    }
-};
-
-//-----------------------------------------------------------------------------
 // Window_BattleLog
 //
 // The window for displaying battle progress. No frame is displayed, but it is

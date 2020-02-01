@@ -392,11 +392,20 @@ Scene_BattleTS.prototype.start = function() {
     this.menuCalling = false;
     this._statusWindow.refresh();
     this.loadFacesetEnemy();
+    this.setTransparentAlive();
 };
 
 Scene_BattleTS.prototype.loadFacesetEnemy = function() {
     $gameTroopTS.members().forEach(function(member) {
         ImageManager.loadEnemy(member.battlerName());
+    });
+};
+
+Scene_BattleTS.prototype.setTransparentAlive = function() {
+    $gamePartyTS.members().concat($gameTroopTS.members()).forEach(function(member) {
+        if (!member.isAlive()) {
+            member.event().setTransparent(true);
+        }
     });
 };
 
