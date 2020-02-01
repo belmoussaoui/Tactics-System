@@ -205,9 +205,8 @@ BattleManagerTS.initMembers = function() {
 CombatScene.BattleManagerTS_setupAction = BattleManagerTS.setupAction;
 BattleManagerTS.setupAction = function() {
     CombatScene.BattleManagerTS_setupAction.call(this);
-    var action = this._subject.currentAction();
-    if (action && action.isValid() && !action.isWait()) {
-        var target = action.makeTargets()[0];
+    if (this._action && this._action.isValid() && !this._action.isWait()) {
+        var target = this._targets[0];
         $gameSelectorTS.performTransfer(target.x, target.y);
         this._startCombat = true;
         this._waitCount = CombatScene.endTransitionDelay;

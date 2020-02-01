@@ -688,6 +688,7 @@ BattleManagerTS.initMembers = function() {
     this._subject = null;
     this._action = null;
     this._targets = [];
+    this._targetIndex = -1;
     this._logWindow = null;
     this._subjectWindow = null;
     this._targetWindow = null;
@@ -1200,9 +1201,15 @@ BattleManagerTS.updateMove = function() {
 };
 
 BattleManagerTS.setupAction = function() {
-    var action = this._subject.currentAction();
-    if (action && action.isValid()) {
-        this.setupCombat(action);
+    this._action = this._subject.currentAction();
+    if (this._action && this._action.isValid()) {
+        // Make Targets here before.
+        this.setupCombat(this._action);
+        var subject = this._subject;
+        var targets = this._action.makeTargets();
+        this._targetIndex = -1;
+        this._targets = targets;
+        this.setDirectionTargets();
     }
     this._battlePhase = 'open';
 };
@@ -1210,6 +1217,7 @@ BattleManagerTS.setupAction = function() {
 BattleManagerTS.processAction = function() {
     var subject = this._subject;
     var action = subject.currentAction();
+    this._action = action;
     if (action) {
         action.prepare();
         if (action.isValid()) {
@@ -1244,22 +1252,19 @@ BattleManagerTS.updateClose = function() {
 };
 
 BattleManagerTS.startAction = function() {
-    var subject = this._subject;
-    var action = subject.currentAction();
-    var targets = action.makeTargets();
     this._battlePhase = 'action';
-    this._action = action;
-    this._targets = targets;
-    subject.useItem(action.item());
+    this._subject.useItem(this._action.item());
     this._action.applyGlobal();
-    this._logWindow.startAction(subject, action, targets);
+    // legal to pass object argument in oop?
+    this._logWindow.startAction(this._subject, this._action, this._targets);
 };
 
 BattleManagerTS.updateAction = function() {
-    var target = this._targets.shift();
+    this._targetIndex++;
+    var target = this._targets[this._targetIndex];
     if (target) {
+        this.turnTowardCharacter(target);
         $gameSelectorTS.performTransfer(target.x, target.y);
-        //this.turnTowardCharacter(target);
         this.invokeAction(this._subject, target);
     } else {
         this._logWindow.endAction(this._subject);
@@ -1267,7 +1272,20 @@ BattleManagerTS.updateAction = function() {
     }
 };
 
+BattleManagerTS.setDirectionTargets = function() {
+    this._targets.forEach(function(target) {
+        this.turnTowardCharacter(target);
+    }, this);
+};
+
+BattleManagerTS.restoreDirectionTargets = function() {
+    this._targets.forEach(function(target) {
+        target.event().setDirection(2);
+    }, this);
+};
+
 BattleManagerTS.nextAction = function() {
+    this.restoreDirectionTargets();
     if (this._subject.nextAction() && this._subject.isActor() && !this._subject.isAutoBattle()) {
         this.processCancel();
         this._targetWindow.close();
@@ -1342,6 +1360,7 @@ BattleManagerTS.endPlayerPhase = function() {
         this._logWindow.displayAutoAffectedStatus(enemy);
         this._logWindow.displayRegeneration(enemy);
     }, this);
+    $gamePartyTS.onTurnStart();
     $gameSelectorTS.setTransparent(true);
     $gameSelectorTS.savePosition();
     $gameMap.eraseTiles();
@@ -2863,8 +2882,12 @@ Sprite_BattlerTS.prototype.damageOffsetY = function() {
     return 24;
 };
 
+Sprite_BattlerTS.prototype.isChangeColor = function() {
+    return this._battler.isActor && this._battler.canAction() && !this._battler.isRestricted();
+};
+
 Sprite_BattlerTS.prototype.updateColor = function() {
-    if (this._battler.canAction() && !this._battler.isRestricted()) {
+    if (this.isChangeColor()) {
         this.setColorTone([0, 0, 0, 0]);
     } else {
         this.setColorTone([0, 0, 0, 255]);
@@ -3764,7 +3787,6 @@ Game_Battler.prototype.onTurnStart = function() {
 Game_Battler.prototype.onActionEnd = function() {
     this._canAction = false;
     this.event().setDirection(2);
-    this.event().setStepAnime(false);
 };
 
 Game_Battler.prototype.isMoving = function() {
@@ -4120,6 +4142,11 @@ Game_Actor.prototype.makeAutoBattleMoves = function() {
     $gameMap.eraseTiles();
     this._tx = saveX;
     this._ty = saveY;
+};
+
+Game_Actor.prototype.onActionEnd = function() {
+    Game_Battler.prototype.onActionEnd.call(this);
+    this.event().setStepAnime(false);
 };
 
 //-----------------------------------------------------------------------------
