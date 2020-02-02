@@ -1,5 +1,5 @@
 //=============================================================================
-// BattlePreparation.js v1.0
+// BattlePreparation.js
 //=============================================================================
 
 /*:
@@ -16,10 +16,6 @@
  * @desc The start battle term.
  * @default Start Battle
  *
- * @param start battle term
- * @desc The start battle term.
- * @default Start Battle
- *
  * @param preparation phase id
  * @desc The switch id to set if it's the preparation phase.
  * @default 4
@@ -27,7 +23,7 @@
  * @help
  *
  * For more information, please consult :
- *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system.97023/
+ *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system-1-0.117600/
  */
 
 var BattlePreparation = BattlePreparation || {};
