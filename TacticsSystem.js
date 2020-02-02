@@ -1042,9 +1042,9 @@ BattleManagerTS.previousSelect = function() {
     this._battlePhase = 'explore';
     this._subject.restorePosition();
     var select = $gameSelectorTS.select();
-    this.refreshMoveTiles();
     this._subject = null;
     $gameSelectorTS.updateSelect();
+    this.refreshMoveTiles();
     var select = $gameSelectorTS.select();
     if (select && select.isAlive()) {
         this._subjectWindow.open(select);
