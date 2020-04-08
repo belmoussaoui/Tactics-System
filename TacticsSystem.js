@@ -3303,24 +3303,6 @@ DataManager.createGameObjects = function() {
     TacticsSystem.DataManager_createGameObjects.call(this);
 };
 
-
-TacticsSystem.DataManager_makeSaveContents = DataManager.makeSaveContents;
-DataManager.makeSaveContents = function() {
-    TacticsSystem.DataManager_makeSaveContents.call(this);
-    contents.partyTS = $gamePartyTS;
-    contents.troopTS = $gameTroopTS;
-    // Need to create a game battle object for save in battle.
-    return contents;
-};
-
-TacticsSystem.DataManager_extractSaveContents = DataManager.extractSaveContents;
-DataManager.extractSaveContents = function(contents) {
-    TacticsSystem.DataManager_extractSaveContents.call(this, contents);
-    $gamePartyTS = contents.partyTS;
-    $gameTroopTS = contents.troopTS;
-};
-
-
 //-----------------------------------------------------------------------------
 // SceneManager
 //
