@@ -542,7 +542,8 @@ Scene_BattleTS.prototype.commandItem = function() {
 Scene_BattleTS.prototype.commandEvent = function() {
     var subject = BattleManagerTS.actor();
     var eventId = subject.actionsButton()[this._actorCommandWindow.index()];
-    var event = $gameMap.event(eventId)
+    var event = $gameMap.event(eventId);
+    event.setActor(subject);
     event.start();
     BattleManagerTS.turnTowardCharacter(event);
     this.onSelectAction();
@@ -625,6 +626,7 @@ Scene_BattleTS.prototype.onItemCancel = function() {
 };
 
 Scene_BattleTS.prototype.onSelectAction = function() {
+    $gameTemp.setCancel(false);
     this._skillWindow.hide();
     this._itemWindow.hide();
     this._actorCommandWindow.close();
@@ -4502,6 +4504,7 @@ TacticsSystem.Game_Event_initMembers = Game_Event.prototype.initMembers;
 Game_Event.prototype.initMembers = function() {
     TacticsSystem.Game_Event_initMembers.call(this);
     this._battler = null;
+    this._actor = null;
 };
 
 Game_Event.prototype.setBattler = function(battler) {
@@ -4519,6 +4522,15 @@ Game_Event.prototype.isEnemy = function() {
 // no oop ! copy ? index ?
 Game_Event.prototype.battler = function() {
     return this._battler;
+};
+
+Game_Event.prototype.setActor = function(actor) {
+    this._actor = actor;
+};
+
+// no oop ! copy ? index ?
+Game_Event.prototype.actor = function() {
+    return this._actor;
 };
 
 Game_Event.prototype.tparam = function(paramString) {
@@ -4727,6 +4739,9 @@ Bitmap.prototype.drawLine = function(x1, y1, x2, y2) {
                 if (args[0].toUpperCase() === 'OFF') {
                     TacticsSystem.clearAll = false;
                 }
+                break;
+            case 'TS.actorTurnEnd':
+                BattleManagerTS.endAction();
                 break;
         }
     };
