@@ -468,7 +468,7 @@ Scene_BattleTS.prototype.updateDestination = function() {
 };
 
 Scene_BattleTS.prototype.isMapTouchOk = function() {
-    return this.isActive() && BattleManagerTS.isActive();
+    return this.isActive() && BattleManagerTS.isActive() && !this._mapWindow.active;
 };
 
 Scene_BattleTS.prototype.processMapTouch = function() {
