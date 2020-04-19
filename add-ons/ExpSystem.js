@@ -7,14 +7,20 @@
  * Requires: TacticsSystem.js
  * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
  *
+ * @param attack exp formula
+ * @desc The gain experience formula for an attack.
+ * @default b.exp() / 10
+ *
  * @help
  *
  * For more information, please consult :
- *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system.97023/
+ *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system-1-0.117600/
  */
 
 var ExpGainSystem = ExpGainSystem || {};
-ExpGainSystem.Parameters = PluginManager.parameters('ExpGainSystem');
+ExpGainSystem.Parameters = PluginManager.parameters('ExpSystem');
+
+ExpGainSystem.attackExpFormula = String(ExpGainSystem.Parameters['attack exp formula']);
 
 //-----------------------------------------------------------------------------
 // Scene_BattleTS
@@ -25,7 +31,6 @@ ExpGainSystem.Scene_BattleTS_createAllWindows = Scene_BattleTS.prototype.createA
 Scene_BattleTS.prototype.createAllWindows = function() {
     ExpGainSystem.Scene_BattleTS_createAllWindows.call(this);
     this.createExpWindow();
-    this.createLevelUpWindow();
 };
 
 Scene_BattleTS.prototype.createExpWindow = function() {
@@ -33,14 +38,6 @@ Scene_BattleTS.prototype.createExpWindow = function() {
     this._expWindow.x = Graphics.width/2 - this._expWindow.width/2;
     this._expWindow.y = Graphics.height/2 - this._expWindow.height/2;
     this.addWindow(this._expWindow);
-};
-
-Scene_BattleTS.prototype.createLevelUpWindow = function() {
-    this._levelUpWindow = new Window_LevelUp();
-    this._levelUpWindow.x = Graphics.width/2 - this._levelUpWindow.width/2;
-    this._levelUpWindow.y = Graphics.height/2 - this._levelUpWindow.height/2;
-    this.addWindow(this._levelUpWindow);
-    this._expWindow.setLevelUpWindow(this._levelUpWindow);
 };
 
 ExpGainSystem.Scene_BattleTS_createDisplayObjects = Scene_BattleTS.prototype.createDisplayObjects;
@@ -51,8 +48,7 @@ Scene_BattleTS.prototype.createDisplayObjects = function() {
 
 ExpGainSystem.Scene_BattleTS_isAnyInputWindowActive = Scene_BattleTS.prototype.isAnyInputWindowActive;
 Scene_BattleTS.prototype.isAnyInputWindowActive = function() {
-    return ExpGainSystem.Scene_BattleTS_isAnyInputWindowActive.call(this) || this._expWindow.active
-        || this._levelUpWindow.active;
+    return ExpGainSystem.Scene_BattleTS_isAnyInputWindowActive.call(this) || this._expWindow.active;
 };
 
 //-----------------------------------------------------------------------------
@@ -73,16 +69,22 @@ BattleManagerTS.setExpWindow = function(expWindow) {
 ExpGainSystem.BattleManagerTS_invokeAction = BattleManagerTS.invokeAction;
 BattleManagerTS.invokeAction = function(subject, target) {
     ExpGainSystem.BattleManagerTS_invokeAction.call(this, subject, target);
-    if (!target.isActor() && !target.isAlive()) {
-        this.gainRewardsEnemy(target);
+    if (this._subject.isActor() && !target.isActor()) {
+        if (!target.isAlive()) {
+            this.gainRewardsEnemy(target);
+        } else {
+            this.gainRewardsAttack(target);
+        }
     }
+
 };
 
 ExpGainSystem.BattleManagerTS_nextAction = BattleManagerTS.nextAction;
 BattleManagerTS.nextAction = function() {
-    if (this._rewards.exp > 0) {
+    if (this._rewards.exp > 0 && this._subject.isActor()) {
+        this._infoWindow.close();
         this._expWindow.setup(this._subject);
-        this._subject.gainExp(this._rewards.exp);
+        this._subject.gainExp(this._rewards.exp, false);
         this.displayRewards();
         this.gainRewards();
         this.makeRewards();
@@ -104,9 +106,29 @@ BattleManagerTS.gainRewardsEnemy = function(enemy) {
     this._rewards.items = this._rewards.items.concat(enemy.makeDropItems());
 };
 
+BattleManagerTS.gainRewardsAttack = function(enemy) {
+    this._rewards.exp += this._action.evalDamageExp(enemy);
+};
+
 BattleManagerTS.gainRewards = function() {
     this.gainGold();
     this.gainDropItems();
+};
+
+BattleManagerTS.displayRewards = function() {
+};
+
+Game_Action.prototype.evalDamageExp = function(target) {
+    try {
+        var item = this.item();
+        var a = this.subject();
+        var b = target;
+        var value = Math.max(eval(ExpGainSystem.attackExpFormula), 0);
+        if (isNaN(value)) value = 0;
+        return value;
+    } catch (e) {
+        return 0;
+    }
 };
 
 //-----------------------------------------------------------------------------
@@ -115,7 +137,7 @@ BattleManagerTS.gainRewards = function() {
 // The game object class for an actor.
 
 Game_Actor.prototype.expRate = function() {
-    return (this.currentExp() - this.currentLevelExp()) / this.nextLevelExp();
+    return (this.currentExp() - this.currentLevelExp()) / (this.nextLevelExp() - this.currentLevelExp());
 };
 
 Game_Actor.prototype.expRate100 = function() {
@@ -129,26 +151,6 @@ Game_Actor.prototype.gainRate = function() {
 ExpGainSystem.Game_Actor_changeExp = Game_Actor.prototype.changeExp;
 Game_Actor.prototype.changeExp = function(exp, show) {
     ExpGainSystem.Game_Actor_changeExp.call(this, exp, false);
-};
-
-//-----------------------------------------------------------------------------
-// Window_Base
-//
-// The superclass of all windows within the game.
-
-Window_Base.prototype.expGaugeColor1 = function() {
-    return this.textColor(14);
-};
-
-Window_Base.prototype.expGaugeColor2 = function() {
-    return this.textColor(21);
-};
-
-Window_Base.prototype.drawGauge = function(x, y, width, rate, color1, color2) {
-    var fillW = Math.floor(width * rate);
-    var gaugeY = y + this.lineHeight() - 12;
-    this.contents.fillRect(x, gaugeY, width, 10, this.gaugeBackColor());
-    this.contents.gradientFillRect(x, gaugeY, fillW, 10, color1, color2);
 };
 
 //-----------------------------------------------------------------------------
@@ -173,13 +175,12 @@ Window_Exp.prototype.initialize = function() {
     this._tempActor = null;
     this._showCount = 0;
     this._waitCount = 0;
-    this._levelUpWindow = null;
     this.refresh();
     this.deactivate();
 };
 
 Window_Exp.prototype.windowWidth = function() {
-    return 300;
+    return 550;
 };
 
 Window_Exp.prototype.windowHeight = function() {
@@ -187,11 +188,7 @@ Window_Exp.prototype.windowHeight = function() {
 };
 
 Window_Exp.prototype.numVisibleRows = function() {
-    return 1;
-};
-
-Window_Exp.prototype.setLevelUpWindow = function(levelUpWindow) {
-    this._levelUpWindow = levelUpWindow;
+    return 4;
 };
 
 Window_Exp.prototype.setup = function(actor) {
@@ -203,7 +200,6 @@ Window_Exp.prototype.setup = function(actor) {
     this.refresh();
     this.activate();
     this.open();
-    this._levelUpWindow.setTempActor(actor);
     Window_Base.prototype.open.call(this);
 };
 
@@ -214,8 +210,14 @@ Window_Exp.prototype.update = function() {
         } else {
             this.updateWaitCount()
         }
+        this.updateInput();
     }
     Window_Base.prototype.update.call(this);
+};
+
+Window_Exp.prototype.isTriggered = function() {
+    return (Input.isRepeated('ok') || Input.isRepeated('cancel') ||
+            TouchInput.isRepeated());
 };
 
 Window_Exp.prototype.updateGaugeExp = function() {
@@ -232,22 +234,19 @@ Window_Exp.prototype.updateGaugeExp = function() {
 Window_Exp.prototype.updateWaitCount = function() {
     this._waitCount++;
     if (this._waitCount > 60) {
-        this._actor = null;
-        this.deactivate();
-        this.close();
-        this.showLevelUp();
+        this.pause = true;
     }
 };
 
-Window_Exp.prototype.showLevelUp = function() {
-    if (this.needLevelUp()) {
-        this._levelUpWindow.refresh();
-        this._levelUpWindow.open();
+Window_Exp.prototype.updateInput = function() {
+    if (this.pause) {
+        if (this.isTriggered()) {
+            this.pause = false;
+            this._actor = null;
+            this.deactivate();
+            this.close();
+        }
     }
-};
-
-Window_Exp.prototype.needLevelUp = function() {
-    return this._level !== this._tempActor.level;
 };
 
 Window_Exp.prototype.needRefresh = function() {
@@ -258,21 +257,49 @@ Window_Exp.prototype.needRefresh = function() {
 Window_Exp.prototype.refresh = function() {
     this.contents.clear();
     if (this._actor) {
+        this.drawActorFace(this._actor, 0, 0, Window_Base._faceWidth, Window_Base._faceHeight);
+        this.drawActorSimpleStatus(this._actor, 0, 0, 408);
         this.drawExpInfo();
     }
 };
 
+Window_Exp.prototype.drawActorSimpleStatus = function(actor, x, y, width) {
+    var lineHeight = this.lineHeight();
+    var x2 = x + 150;
+    var width2 = Math.min(200, width - 180 - this.textPadding());
+    this.drawActorName(actor, x, y);
+    this.drawActorIcons(actor, x, y + lineHeight * 2);
+    this.drawActorClass(actor, x2, y);
+};
+
 Window_Exp.prototype.drawExpInfo = function() {
     var rate = this._tempActor.expRate();
-    this.drawActorLevel(this._tempActor.level, 0, 0);
-    this.drawGaugeArea(50, 0, this.contentsWidth() - 50, rate);
+    var lineHeight = this.lineHeight();
+    var x = 150;
+    var y = lineHeight * 2;
+    this.drawActorLevel(this._tempActor.level, x, lineHeight);
+    this.drawGaugeArea(x + 60, lineHeight, this.contentsWidth() - x - 70, rate);
+    var expTotal = TextManager.expTotal.format(TextManager.exp);
+    var expNext = TextManager.expNext.format(TextManager.level);
+    var value1 = this._actor.currentExp();
+    var value2 = this._actor.nextRequiredExp();
+    if (this._actor.isMaxLevel()) {
+        value1 = '-------';
+        value2 = '-------';
+    }
+    this.changeTextColor(this.systemColor());
+    this.drawText(expTotal, x, y + lineHeight * 0, 350);
+    this.drawText(expNext, x, y + lineHeight * 1, 350);
+    this.resetTextColor();
+    this.drawText(value1, x, y + lineHeight * 0, 350, 'right');
+    this.drawText(value2, x, y + lineHeight * 1, 350, 'right');
 };
 
 Window_Exp.prototype.drawActorLevel = function(level, x, y) {
     this.changeTextColor(this.systemColor());
-    this.drawText(TextManager.levelA, x, y + 8, 32);
+    this.drawText(TextManager.levelA, x, y, 32);
     this.resetTextColor();
-    this.drawText(level, x + 32, y + 8, 32);
+    this.drawText(level, x + 32, y, 32);
 };
 
 Window_Exp.prototype.drawGaugeArea = function(x, y, width, rate) {
@@ -281,7 +308,7 @@ Window_Exp.prototype.drawGaugeArea = function(x, y, width, rate) {
     var color2 = this.expGaugeColor2();
     this.drawGauge(x, y, width, rate, color1, color2);
     var rate100 = Math.floor(rate * 100);
-    this.drawText(rate100, width * rate - 8 + 50, y, 64);
+    this.drawText(rate100, width * rate - 8 + x, y, 64);
 };
 
 Window_Exp.prototype.setTempActor = function(actor) {
@@ -292,126 +319,17 @@ Window_Exp.prototype.setTempActor = function(actor) {
     }
 };
 
-//-----------------------------------------------------------------------------
-// Window_LevelUp
-//
-// The window for displaying the level up.
-
-function Window_LevelUp() {
-    this.initialize.apply(this, arguments);
-}
-
-Window_LevelUp.prototype = Object.create(Window_Base.prototype);
-Window_LevelUp.prototype.constructor = Window_LevelUp;
-
-Window_LevelUp.prototype.initialize = function() {
-    var wight = this.windowWidth();
-    var height = this.windowHeight();
-    Window_Base.prototype.initialize.call(this, 0, 0, wight, height);
-    this.openness = 0;
-    this._actor = null;
-    this._tempActor = null;
-    this.refresh();
-    this.deactivate();
+Window_Exp.prototype.expGaugeColor1 = function() {
+    return this.textColor(14);
 };
 
-Window_LevelUp.prototype.setup = function(actor) {
-    this._actor = actor;
-    this.refresh();
-    this._waitCount = 0;
+Window_Exp.prototype.expGaugeColor2 = function() {
+    return this.textColor(21);
 };
 
-Window_LevelUp.prototype.open = function() {
-    Window_Base.prototype.open.call(this);
-    this.activate();
-};
-
-Window_LevelUp.prototype.windowWidth = function() {
-    return 280;
-};
-
-Window_LevelUp.prototype.windowHeight = function() {
-    return this.fittingHeight(this.numVisibleRows());
-};
-
-Window_LevelUp.prototype.numVisibleRows = function() {
-    return 7;
-};
-
-Window_LevelUp.prototype.update = function() {
-    Window_Base.prototype.update.call(this);
-    if (this.active) {
-        if (Input.isTriggered('ok')) {
-            this.hide()
-            this.deactivate();
-            this.close();
-        }
-    }
-};
-
-Window_LevelUp.prototype.refresh = function() {
-    this.contents.clear();
-    if (this._actor) {
-        var lineHeight = this.lineHeight();
-        this.changeTextColor(this.systemColor());
-        this.drawActorClass(this._actor, 0, lineHeight * 0);
-        this.drawBattlerLevel(this._actor, this.contentsWidth() - 48, 0);
-        this.resetTextColor();
-        this.drawHorzLine(lineHeight * 0);
-        for (var i = 0; i < 6; i++) {
-            this.drawItem(0, this.lineHeight() * (1 + i), 2 + i);
-        }
-    }
-};
-
-Window_LevelUp.prototype.drawItem = function(x, y, paramId) {
-    this.drawParamName(x + this.textPadding(), y, paramId);
-    if (this._tempActor) {
-        this.drawCurrentParam(x + 120, y, paramId);
-    }
-    this.drawRightArrow(x + 168, y);
-    if (this._actor && this._tempActor) {
-        this.drawNewParam(x + 176, y, paramId);
-    }
-};
-
-Window_LevelUp.prototype.drawParamName = function(x, y, paramId) {
-    this.changeTextColor(this.systemColor());
-    this.drawText(TextManager.param(paramId), x, y, 120);
-};
-
-Window_LevelUp.prototype.drawCurrentParam = function(x, y, paramId) {
-    this.resetTextColor();
-    this.drawText(this._tempActor.paramBase(paramId), x, y, 48, 'right');
-};
-
-Window_LevelUp.prototype.drawRightArrow = function(x, y) {
-    this.changeTextColor(this.systemColor());
-    this.drawText('\u2192', x, y, 32, 'center');
-};
-
-Window_LevelUp.prototype.drawNewParam = function(x, y, paramId) {
-    var newValue = this._actor.paramBase(paramId);
-    var diffvalue = newValue - this._tempActor.paramBase(paramId);
-    this.changeTextColor(this.paramchangeTextColor(diffvalue));
-    this.drawText(newValue, x, y, 48, 'right');
-};
-
-Window_LevelUp.prototype.drawHorzLine = function(y) {
-    var lineY = y + this.lineHeight() - 1;
-    this.contents.paintOpacity = 48;
-    this.contents.fillRect(0, lineY, this.contentsWidth(), 2, this.lineColor());
-    this.contents.paintOpacity = 255;
-};
-
-Window_LevelUp.prototype.lineColor = function() {
-    return this.systemColor();
-};
-
-Window_LevelUp.prototype.setTempActor = function(actor) {
-    var tempActor = JsonEx.makeDeepCopy(actor);
-    if (this._tempActor !== tempActor) {
-        this._tempActor = tempActor;
-        this.refresh();
-    }
+Window_Exp.prototype.drawGauge = function(x, y, width, rate, color1, color2) {
+    var fillW = Math.floor(width * rate);
+    var gaugeY = y + this.lineHeight() - 16;
+    this.contents.fillRect(x, gaugeY, width, 10, this.gaugeBackColor());
+    this.contents.gradientFillRect(x, gaugeY, fillW, 10, color1, color2);
 };
