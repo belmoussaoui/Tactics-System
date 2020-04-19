@@ -1,5 +1,5 @@
 //=============================================================================
-// TacticsSystem.js v1.0.1
+// TacticsSystem.js v1.1
 //=============================================================================
 
 /*:
@@ -166,6 +166,7 @@
  *   TS.selectorTransfer x y      # Move immediately the selector to position x and y.
  *   TS.selectorEvent eventId     # Move immediately the selector to position at event of eventId.
  *   TS.clearAll [ON/OFF]         # Activate or desactivate clear all condition victory.
+ *   TS.actorTurnEnd              # Ends the subject's turn.
  */
 
 var TacticsSystem = TacticsSystem || {};
@@ -1266,7 +1267,6 @@ BattleManagerTS.startAction = function() {
     this._battlePhase = 'action';
     this._subject.useItem(this._action.item());
     this._action.applyGlobal();
-    // legal to pass object argument in oop?
     this._logWindow.startAction(this._subject, this._action, this._targets);
 };
 
