@@ -83,27 +83,27 @@
  * @param damage term (abbr.)
  * @parent text manager
  * @desc The damage abbrevation term.
- * @default Dmg
+ * @default Damage
  *
  * @param recover term (abbr.)
  * @parent text manager
  * @desc The recover abbrevation term.
- * @default Rcv
+ * @default Recover
  *
  * @param drain term (abbr.)
  * @parent text manager
  * @desc The drain abbrevation term.
- * @default Drn
+ * @default Drain
  *
  * @param hit rate term (abbr.)
  * @parent text manager
  * @desc The hit rate abbrevation term.
- * @default Hit
+ * @default Hit Rate
  *
  * @param critical rate term (abbr.)
  * @parent text manager
  * @desc The critical rate abbrevation term.
- * @default Cri
+ * @default Cri Rate
  *
  * @param wait command name
  * @parent text manager
@@ -265,7 +265,7 @@ Scene_BattleTS.prototype.createBattleWindow = function() {
 
 Scene_BattleTS.prototype.createSubjectWindow = function() {
     this._subjectWindow = new Window_BattleStatusTS();
-    this._subjectWindow.x = Graphics.width/2 - this._subjectWindow.width - 32;
+    this._subjectWindow.x = (Graphics.width - 816) / 2 + Graphics.width - 816;
     this.addWindow(this._subjectWindow);
 };
 
@@ -323,9 +323,8 @@ Scene_BattleTS.prototype.createMessageWindow = function() {
 
 Scene_BattleTS.prototype.createInfoWindow = function() {
     this._infoWindow = new Window_BattleInfoTS();
-    this._infoWindow.y = Graphics.boxHeight - this._infoWindow.height;
-    this._infoWindow.y -= this._subjectWindow.height;
-    this._infoWindow.x = Graphics.width/2 + 32;
+    this._infoWindow.x = (Graphics.width - 816) / 2 + Graphics.width - 816;
+    this._infoWindow.y = Graphics.height/2 - this._infoWindow.height/2;
     this.addWindow(this._infoWindow);
 };
 
@@ -404,7 +403,7 @@ Scene_BattleTS.prototype.loadFacesetEnemy = function() {
 
 Scene_BattleTS.prototype.setTransparentAlive = function() {
     $gamePartyTS.members().concat($gameTroopTS.members()).forEach(function(member) {
-        if (!member.isAlive()) {
+        if (member.isDead()) {
             member.event().setTransparent(true);
         }
     });
@@ -1062,6 +1061,7 @@ BattleManagerTS.processTarget = function() {
 
 // in game selectorTS
 BattleManagerTS.updateTarget = function() {
+    this._subjectWindow.close();
     if ($gameSelectorTS.isMoving()) {
         this.refreshTarget();
     }
@@ -1112,7 +1112,7 @@ BattleManagerTS.refreshTarget = function() {
     var select = $gameSelectorTS.select();
     if (select && select.isAlive()) {
         this._subject.turnTowardCharacter(select);
-        this._targetWindow.open(select);
+        //this._targetWindow.open(select);
         this.refreshInfo();
     } else {
         this._subject.event().setDirection(2);
@@ -1224,6 +1224,9 @@ BattleManagerTS.setupAction = function() {
         this.setDirectionTargets();
     }
     this._battlePhase = 'open';
+    this._subjectWindow.close();
+    this._targetWindow.close();
+    this._infoWindow.close();
 };
 
 BattleManagerTS.processAction = function() {
@@ -1256,9 +1259,6 @@ BattleManagerTS.endAction = function() {
 
 BattleManagerTS.updateClose = function() {
     this._battlePhase = 'start';
-    this._subjectWindow.close();
-    this._targetWindow.close();
-    this._infoWindow.close();
     this._subject.onActionEnd();
     this._subject = null;
 };
@@ -2233,20 +2233,6 @@ Window_BattleStatusTS.prototype.drawEnemySimpleStatus = function(enemy, x, y, wi
     this.drawActorMp(enemy, x2, y + lineHeight * 2, width2);
 };
 
-Window_BattleStatusTS.prototype.drawEnemyImage = function(battler, x, y) {
-    width = Window_Base._faceWidth;
-    height = Window_Base._faceHeight;
-    var bitmap = ImageManager.loadEnemy(battler.battlerName());
-    var pw = bitmap.width;
-    var ph = bitmap.height;
-    var sw = Math.min(width, pw);
-    var sh = Math.min(height, ph);
-    var dx = Math.floor(x + Math.max(width - pw, 0) / 2);
-    var dy = Math.floor(y + Math.max(height - ph, 0) / 2);
-    var q = 150 / Math.max(bitmap.width, bitmap.height)
-    this.contents.blt(bitmap, 0, 0, pw, ph, 0, 0, bitmap.width * q, bitmap.height * q);
-};
-
 //-----------------------------------------------------------------------------
 // Window_BattleSkillTS
 //
@@ -2328,18 +2314,18 @@ function Window_BattleInfoTS() {
     this.initialize.apply(this, arguments);
 }
 
-Window_BattleInfoTS.prototype = Object.create(Window_Base.prototype);
+Window_BattleInfoTS.prototype = Object.create(Window_Status.prototype);
 Window_BattleInfoTS.prototype.constructor = Window_BattleInfoTS;
 
 Window_BattleInfoTS.prototype.initialize = function() {
-    var width = this.windowWidth();
-    var height = this.windowHeight();
-    Window_Base.prototype.initialize.call(this, 0, 0, width, height);
+    Window_Status.prototype.initialize.call(this, 0, 0);
     this.openness = 0;
+    this.width = this.windowWidth();
+    this.height = this.windowHeight();
 };
 
 Window_BattleInfoTS.prototype.windowWidth = function() {
-    return 816/2 - 32;
+    return 816/2 - 64;
 };
 
 Window_BattleInfoTS.prototype.windowHeight = function() {
@@ -2347,100 +2333,99 @@ Window_BattleInfoTS.prototype.windowHeight = function() {
 };
 
 Window_BattleInfoTS.prototype.numVisibleRows = function() {
-    return 1;
+    return 15;
 };
 
 Window_BattleInfoTS.prototype.open = function(battlerTS) {
-    this.refresh(battlerTS);
+    this.setActor(battlerTS);
     Window_Base.prototype.open.call(this);
 };
 
-Window_BattleInfoTS.prototype.refresh = function(battler) {
+Window_Status.prototype.refresh = function() {
     this.contents.clear();
-    this.drawItem(battler);
+    if (this._actor) {
+        var lineHeight = this.lineHeight();
+        this.drawBlock1(lineHeight * 0);
+        this.drawHorzLine(lineHeight * 4);
+        this.drawBlock2(lineHeight * 5);
+        this.drawHorzLine(lineHeight * 11);
+        this.drawBlock3(lineHeight * 12);
+    }
 };
 
-Window_BattleInfoTS.prototype.drawItem = function(battler) {
-    this.drawDamage(battler, 0, 0, 80);
-    this.drawHit(battler, 130, 0, 80);
-    this.drawCri(battler, 235, 0, 80);
+Window_BattleInfoTS.prototype.drawBlock1 = function(y) {
+     if (this._actor.isActor()) {
+        this.drawActorFace(this._actor, 8, y);
+    } else {
+        this.drawEnemyImage(this._actor, 8, y);
+    }
+    this.drawBasicInfo(120, y);
+    //this.drawExpInfo(456, y);
 };
 
-Window_BattleInfoTS.prototype.drawBattlerLevel = function(actor, x, y) {
-    this.changeTextColor(this.systemColor());
-    this.drawText(TextManager.levelA, x, y, 48);
-    this.resetTextColor();
-    this.drawText(actor.level, x, y, 36, 'right');
+Window_BattleInfoTS.prototype.drawBasicInfo = function(x, y) {
+    var lineHeight = this.lineHeight();
+    this.drawActorName(this._actor, 12, y);
+    if (this._actor.isActor()) {
+        this.drawActorLevel(this._actor, x, y + lineHeight * 0);
+    }
+    this.drawActorIcons(this._actor, x, y + lineHeight * 1);
+    this.drawActorHp(this._actor, x, y + lineHeight * 2);
+    this.drawActorMp(this._actor, x, y + lineHeight * 3);
 };
 
-Window_BattleInfoTS.prototype.drawBattlerHp = function(actor, x, y, width) {
-    width = width || 186;
-    this.changeTextColor(this.systemColor());
-    this.drawText(TextManager.hpA, x, y, 44);
-    this.drawCurrentAndMax(actor.hp, actor.mhp, x, y, width,
-                           this.hpColor(actor), this.normalColor());
+Window_BattleInfoTS.prototype.drawBlock2 = function(y) {
+    this.drawParameters(48, y);
+    if (this._actor.isActor()) {
+       // this.drawEquipments(432, y);
+    }
 };
 
-Window_BattleInfoTS.prototype.drawBattlerMp = function(actor, x, y, width) {
-    width = width || 186;
-    this.changeTextColor(this.systemColor());
-    this.drawText(TextManager.mpA, x, y, 44);
-    this.drawCurrentAndMax(actor.mp, actor.mmp, x, y, width,
-                           this.mpColor(actor), this.normalColor());
+Window_BattleInfoTS.prototype.drawBlock3 = function(y) {
+    var lineHeight = this.lineHeight();
+    this.drawDamage(this._actor, 48, y + lineHeight * 0);
+    this.drawHit(this._actor, 48, y + lineHeight * 1);
+    this.drawCri(this._actor, 48, y + lineHeight * 2);
 };
 
-Window_BattleInfoTS.prototype.drawCurrentAndMax = function(current, max, x, y,
-                                                                  width, color1, color2) {
-    var labelWidth = this.textWidth('HP');
-    var valueWidth = this.textWidth('00');
-    var slashWidth = this.textWidth('/');
-    var x1 = x + width - valueWidth;
-    var x2 = x1 - slashWidth;
-    var x3 = x2 - valueWidth;
-    this.changeTextColor(color1);
-    this.drawText(current, x3, y, valueWidth, 'right');
-    this.changeTextColor(color2);
-    this.drawText('/', x2, y, slashWidth, 'right');
-    this.drawText(max, x1, y, valueWidth, 'right');
-};
-
-Window_BattleInfoTS.prototype.drawDamage = function(actor, x, y, width) {
+Window_BattleInfoTS.prototype.drawDamage = function(actor, x, y) {
+    var width = 168;
     var action = BattleManagerTS.inputtingAction();
     this.drawDamageType(actor, x, y, width);
     var minHit = Math.abs(action.testDamageMinMaxValue(actor, false));
     var maxHit = Math.abs(action.testDamageMinMaxValue(actor, true));
-    this.drawText(minHit + '-' + maxHit, x + 45, 0, 65, 'right');
+    this.drawText(minHit + '-' + maxHit, x + 100, y, 120, 'right');
 };
 
-Window_BattleInfoTS.prototype.drawDamageType = function(actor, x, y, width) {
+Window_BattleInfoTS.prototype.drawDamageType = function(actor, x, y) {
     var action = BattleManagerTS.inputtingAction();
     this.changeTextColor(this.systemColor());
     if (action.isDamage()) {
-        this.drawText(TacticsSystem.damageTerm, x, 0, 30);
+        this.drawText(TacticsSystem.damageTerm, x, y, 160);
     } else if (action.isRecover()) {
-        this.drawText(TacticsSystem.recoverTerm, x, 0, 30);
+        this.drawText(TacticsSystem.recoverTerm, x, y, 160);
     } else {
-        this.drawText(TacticsSystem.drainTerm, x, 0, 30);
+        this.drawText(TacticsSystem.drainTerm, x, y, 160);
     }
     this.resetTextColor();
 };
 
-Window_BattleInfoTS.prototype.drawHit = function(actor, x, y, width) {
+Window_BattleInfoTS.prototype.drawHit = function(actor, x, y) {
     this.changeTextColor(this.systemColor());
-    this.drawText(TacticsSystem.hitRateTerm, x, y, 30);
+    this.drawText(TacticsSystem.hitRateTerm, x, y, 160);
     this.resetTextColor();
     var action = BattleManagerTS.inputtingAction();
     var hit = action.itemHit(actor) * 100 + '%';
-    this.drawText(hit, x + 35, y, 50, 'right');
+    this.drawText(hit, x + 160, y, 60, 'right');
 };
 
-Window_BattleInfoTS.prototype.drawCri = function(actor, x, y, width) {
+Window_BattleInfoTS.prototype.drawCri = function(actor, x, y) {
     this.changeTextColor(this.systemColor());
-    this.drawText(TacticsSystem.criticalRateTerm, x, y, 30);
+    this.drawText(TacticsSystem.criticalRateTerm, x, y, 160);
     this.resetTextColor();
     var action = BattleManagerTS.inputtingAction();
-    var hit = action.itemCri(actor) * 100 + '%';
-    this.drawText(hit, x + 35, y, 50, 'right');
+    var crit = action.itemCri(actor) * 100 + '%';
+    this.drawText(crit, x + 160, y, 60, 'right');
 };
 
 //-----------------------------------------------------------------------------
@@ -4627,6 +4612,25 @@ Game_Interpreter.prototype.iterateEnemyIndex = function(param, callback) {
         TacticsSystem.Game_Interpreter_iterateEnemyIndex.call(this, param, callback);
     }
 
+};
+
+//-----------------------------------------------------------------------------
+// Window_Base
+//
+// The superclass of all windows within the game.
+
+Window_Base.prototype.drawEnemyImage = function(battler, x, y) {
+    width = Window_Base._faceWidth;
+    height = Window_Base._faceHeight;
+    var bitmap = ImageManager.loadEnemy(battler.battlerName());
+    var pw = bitmap.width;
+    var ph = bitmap.height;
+    var sw = Math.min(width, pw);
+    var sh = Math.min(height, ph);
+    var dx = Math.floor(x + Math.max(width - pw, 0) / 2);
+    var dy = Math.floor(y + Math.max(height - ph, 0) / 2);
+    var q = 150 / Math.max(bitmap.width, bitmap.height)
+    this.contents.blt(bitmap, 0, 0, pw, ph, 0, 0, bitmap.width * q, bitmap.height * q);
 };
 
 //-----------------------------------------------------------------------------
