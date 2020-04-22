@@ -42,21 +42,24 @@ Scene_BattleTS.prototype.start = function() {
 
 BattlePreparation.Scene_BattleTS_createAllWindows = Scene_BattleTS.prototype.createAllWindows;
 Scene_BattleTS.prototype.createAllWindows = function() {
-    this.createLogWindowBefore();
-    this.createPreparationWindow();
     BattlePreparation.Scene_BattleTS_createAllWindows.call(this);
     this.createFormationWindow();
     if (BattleManagerTS._phase === 'preparationPhase') {
         this._registerWindow = this._mapWindow;
         this._mapWindow = this._formationWindow;
+        this._mapWindow.show();
+        this._mapWindow.activate();
+        this.menuCalling = false;
     } else {
         this._mapWindow.refresh();
     }
+    BattleManagerTS.setMapWindow(this._mapWindow);
 };
 
+BattlePreparation.Scene_BattleTS_createLogWindow = Scene_BattleTS.prototype.createLogWindow;
 Scene_BattleTS.prototype.createLogWindow = function() {
-    // Need to create log window before preparation window.
-    // Else create preparation window after and hide when status window is opened.
+    BattlePreparation.Scene_BattleTS_createLogWindow.call(this);
+    this.createPreparationWindow();
 };
 
 Scene_BattleTS.prototype.createLogWindowBefore = function() {
@@ -133,8 +136,10 @@ Scene_BattleTS.prototype.onFormationCancel = function() {
     }
 };
 
+BattlePreparation.Scene_BattleTS_isAnyInputWindowActive = Scene_BattleTS.prototype.isAnyInputWindowActive;
 Scene_BattleTS.prototype.isAnyInputWindowActive = function() {
-    return (this._actorCommandWindow.active ||
+    return (BattlePreparation.Scene_BattleTS_isAnyInputWindowActive.call(this) ||
+            this._actorCommandWindow.active ||
             this._skillWindow.active ||
             this._itemWindow.active ||
             this._mapWindow.active ||
@@ -153,8 +158,12 @@ Scene_BattleTS.prototype.refreshStatus = function() {
 //
 // The static class that manages battle progress.
 
-BattleManagerTS.setWindowStatus = function (window1) {
-    this._statusWindow2 = window1;
+BattleManagerTS.setMapWindow = function (mapWindow) {
+    this.mapWindow = mapWindow;
+};
+
+BattleManagerTS.setWindowStatus = function (statusWindow) {
+    this._statusWindow2 = statusWindow;
 };
 
 BattlePreparation.BattleManagerTS_createGameObjects = BattleManagerTS.createGameObjects;
@@ -600,12 +609,10 @@ Game_Switches.prototype.updatePhase = function() {
 //
 // The set of sprites on the map screen.
 
+BattlePreparation.Spriteset_MapTS_createBaseTiles = Spriteset_MapTS.prototype.createBaseTiles;
 Spriteset_MapTS.prototype.createBaseTiles = function() {
-    this._tilesSprite = new Sprite_Base();
-    this._tilesSprite.z = 1;
-    this._rangeTilesSprite = this.createTiles(TacticsSystem.moveScopeColor);
+    BattlePreparation.Spriteset_MapTS_createBaseTiles.call(this);
     this._startTilesSprite = this.createTiles(BattlePreparation.startScopeColor);
-    this._tilemap.addChild(this._tilesSprite);
 };
 
 BattlePreparation.Spriteset_MapTS_updateTiles = Spriteset_MapTS.prototype.updateTiles;

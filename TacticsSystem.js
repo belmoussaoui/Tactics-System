@@ -265,7 +265,7 @@ Scene_BattleTS.prototype.createBattleWindow = function() {
 
 Scene_BattleTS.prototype.createSubjectWindow = function() {
     this._subjectWindow = new Window_BattleStatusTS();
-    this._subjectWindow.x = (Graphics.width - 816) / 2 + Graphics.width - 816;
+    this._subjectWindow.x = Graphics.width/2 - 816/2;
     this.addWindow(this._subjectWindow);
 };
 
@@ -289,14 +289,17 @@ Scene_BattleTS.prototype.createActorCommandWindow = function() {
 
 Scene_BattleTS.prototype.createHelpWindow = function() {
     this._helpWindow = new Window_Help();
+    this._helpWindow.x = Graphics.boxWidth/2 - 816/2;
+    this._helpWindow.width = 816
     this._helpWindow.visible = false;
     this.addWindow(this._helpWindow);
 };
 
 Scene_BattleTS.prototype.createSkillWindow = function() {
-    var width = Graphics.boxWidth - this._actorCommandWindow.width;
+    var width = 816 - this._actorCommandWindow.width;
     var height = this._actorCommandWindow.fittingHeight(4);
-    this._skillWindow = new Window_BattleSkillTS(0, this._actorCommandWindow.y, width, height);
+    var x = Graphics.boxWidth/2 - 816/2;
+    this._skillWindow = new Window_BattleSkillTS(x, this._actorCommandWindow.y, width, height);
     this._skillWindow.setHelpWindow(this._helpWindow);
     this._skillWindow.setHandler('ok',     this.onSkillOk.bind(this));
     this._skillWindow.setHandler('cancel', this.onSkillCancel.bind(this));
@@ -304,9 +307,10 @@ Scene_BattleTS.prototype.createSkillWindow = function() {
 };
 
 Scene_BattleTS.prototype.createItemWindow = function() {
-    var width = Graphics.boxWidth - this._actorCommandWindow.width;
+    var width = 816 - this._actorCommandWindow.width;
     var height = this._actorCommandWindow.fittingHeight(4);
-    this._itemWindow = new Window_BattleItemTS(0, this._actorCommandWindow.y, width, height);
+    var x = Graphics.boxWidth/2 - 816/2;
+    this._itemWindow = new Window_BattleItemTS(x, this._actorCommandWindow.y, width, height);
     this._itemWindow.setHelpWindow(this._helpWindow);
     this._itemWindow.setHandler('ok',     this.onItemOk.bind(this));
     this._itemWindow.setHandler('cancel', this.onItemCancel.bind(this));
@@ -323,7 +327,7 @@ Scene_BattleTS.prototype.createMessageWindow = function() {
 
 Scene_BattleTS.prototype.createInfoWindow = function() {
     this._infoWindow = new Window_BattleInfoTS();
-    this._infoWindow.x = (Graphics.width - 816) / 2 + Graphics.width - 816;
+    this._infoWindow.x = Graphics.width/2 - 816/2;
     this._infoWindow.y = Graphics.height/2 - this._infoWindow.height/2;
     this.addWindow(this._infoWindow);
 };
@@ -2101,7 +2105,7 @@ Window_ActorCommandTS.prototype = Object.create(Window_ActorCommand.prototype);
 Window_ActorCommandTS.prototype.constructor = Window_ActorCommandTS;
 
 Window_ActorCommandTS.prototype.initialize = function() {
-    var x = Graphics.boxWidth - this.windowWidth();
+    var x = Graphics.boxWidth/2  + 816/2 - this.windowWidth();
     var y = Graphics.boxHeight - this.windowHeight();
     Window_Command.prototype.initialize.call(this, x, y);
     this.openness = 0;
@@ -2338,6 +2342,7 @@ Window_BattleInfoTS.prototype.numVisibleRows = function() {
 
 Window_BattleInfoTS.prototype.open = function(battlerTS) {
     this.setActor(battlerTS);
+    this.refresh();
     Window_Base.prototype.open.call(this);
 };
 
