@@ -5,7 +5,7 @@ The Tactics System is a tactical battle system plugin for RPG Maker MV.
 * **Expandable by add-on:** The plugin has been developed based on what already existed in RPG Maker MV by following the predefined rules. Thus it is easy to extend the Tactics System with add-ons. A list of add-ons bringing features to the system is already available.
 * **Event-driven:** The management of a battle is done with the event system of Rpg Maker MV. Call enemy reinforcements, write dialogs, add chests, and more.
 
-[Imgur](https://i.imgur.com/oaE23ZT.gifv)
+![hippo]((https://i.imgur.com/oaE23ZT.gifv)
 
 ## Installation
 Download TacticsSystem.js and put it in the plugin folder of your project. Activate the plugin via the plugin manager of RPG Maker MV. If you use add-ons, place them below the TacticsSystem in the list.
