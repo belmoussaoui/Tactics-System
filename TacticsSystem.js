@@ -2342,7 +2342,7 @@ Window_BattleInfoTS.prototype.numVisibleRows = function() {
 
 Window_BattleInfoTS.prototype.open = function(battlerTS) {
     this.setActor(battlerTS);
-    this.refresh();
+    this.refresh()
     Window_Base.prototype.open.call(this);
 };
 
@@ -2362,7 +2362,7 @@ Window_BattleInfoTS.prototype.drawBlock1 = function(y) {
      if (this._actor.isActor()) {
         this.drawActorFace(this._actor, 8, y);
     } else {
-        this.drawEnemyImage(this._actor, 8, y);
+        this.drawEnemyImage(this._actor, 8, y + 48);
     }
     this.drawBasicInfo(120, y);
     //this.drawExpInfo(456, y);
@@ -3967,6 +3967,12 @@ Game_Battler.prototype.performSelect = function() {
     this.requestEffect('whiten');
 };
 
+Game_Battler.prototype.setPosition = function(x, y) {
+    this.event().setPosition(x, y);
+    this._tx = x;
+    this._ty = y
+};
+
 //-----------------------------------------------------------------------------
 // Game_Actor
 //
@@ -4635,7 +4641,7 @@ Window_Base.prototype.drawEnemyImage = function(battler, x, y) {
     var dx = Math.floor(x + Math.max(width - pw, 0) / 2);
     var dy = Math.floor(y + Math.max(height - ph, 0) / 2);
     var q = 150 / Math.max(bitmap.width, bitmap.height)
-    this.contents.blt(bitmap, 0, 0, pw, ph, 0, 0, bitmap.width * q, bitmap.height * q);
+    this.contents.blt(bitmap, 0, 0, pw, ph, dx, dy, bitmap.width * q, bitmap.height * q);
 };
 
 //-----------------------------------------------------------------------------
