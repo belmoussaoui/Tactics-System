@@ -551,6 +551,7 @@ Scene_BattleTS.prototype.commandEvent = function() {
     event.start();
     BattleManagerTS.turnTowardCharacter(event);
     this.onSelectAction();
+    $gameTemp.setCancel(false);
 };
 
 Scene_BattleTS.prototype.commandWait = function() {
@@ -590,11 +591,6 @@ Scene_BattleTS.prototype.selectPreviousCommand = function() {
     }
 };
 
-Scene_BattleTS.prototype.onEventCancel = function() {
-    this._eventWindow.hide();
-    this._actorCommandWindow.activate();
-};
-
 Scene_BattleTS.prototype.onSkillOk = function() {
     this._subjectWindow.show();
     var skill = this._skillWindow.item();
@@ -630,7 +626,6 @@ Scene_BattleTS.prototype.onItemCancel = function() {
 };
 
 Scene_BattleTS.prototype.onSelectAction = function() {
-    $gameTemp.setCancel(false);
     this._skillWindow.hide();
     this._itemWindow.hide();
     this._actorCommandWindow.close();
@@ -659,7 +654,6 @@ Scene_BattleTS.prototype.needsSlowFadeOut = function() {
 
 Scene_BattleTS.prototype.terminate = function() {
     Scene_Base.prototype.terminate.call(this);
-    //BattleManagerTS.terminate();
 };
 
 //-----------------------------------------------------------------------------
@@ -1076,7 +1070,6 @@ BattleManagerTS.updateTarget = function() {
     if ($gameSelectorTS.isOk()) {
         if ($gameMap.isOnTiles(x, y) && action.isTargetValid(select)) {
             SoundManager.playOk();
-            $gameTemp.setCancel(false);
             action.setTarget(select.index());
             this.setupAction();
         } else {
@@ -1217,6 +1210,7 @@ BattleManagerTS.updateMove = function() {
 };
 
 BattleManagerTS.setupAction = function() {
+    $gameTemp.setCancel(false);
     this._action = this._subject.currentAction();
     if (this._action && this._action.isValid()) {
         // Make Targets here before.
