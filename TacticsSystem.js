@@ -3648,8 +3648,10 @@ TacticsSystem.Game_Action_setSubject = Game_Action.prototype.setSubject;
 Game_Action.prototype.setSubject = function(subject) {
     TacticsSystem.Game_Action_setSubject.call(this, subject);
     // For enemy restriction attack an ally...
-    if (!subject.isActor()) {
-        this._subjectEnemyIndex = $gameTroopTS.members().indexOf(subject);
+    if ($gamePartyTS.inBattle()) {
+        if (!subject.isActor()) {
+            this._subjectEnemyIndex = $gameTroopTS.members().indexOf(subject);
+        }
     }
 };
 
