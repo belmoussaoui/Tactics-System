@@ -7,39 +7,34 @@
  * Requires: TacticsSystem.js
  * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
  *
- * @param basic default configuration
- * @text Basic Default Configuration
- * @desc Parameters related to player character.
+ * @param Basic Default Configuration
  *
- * @param cursor speed
- * @parent basic default configuration
- * @text The cursor Speed
+ * @param Cursor Speed
+ * @parent Basic Default Configuration
  * @desc The cursor speed. 1: Slow, 2: Normal, 3: Fast
  * @default 2
  * @min 1
  * @max 3
  * @type Number
  *
- * @param show map grid
- * @parent basic default configuration
- * @text Show Map Grid
+ * @param Show Map Grid
+ * @parent Basic Default Configuration
  * @desc Show the grid of the battle scene.
  * @default true
  * @on Yes
  * @off No
  * @type Boolean
  *
- * @param auto turn end
- * @parent basic default configuration
- * @text Auto Turn End
+ * @param Auto Turn End
+ * @parent Basic Default Configuration
  * @desc Automatically end the player's turn.
  * @default true
  * @on Yes
  * @off No
  * @type Boolean
  *
- * @param unit speed
- * @parent basic default configuration
+ * @param Unit Speed
+ * @parent Basic Default Configuration
  * @text Unit Speed
  * @desc The moving speed of the units.
  * 1: Slow1, 2: Slow2, 3: Slow3 4: Norm, 5: Fast1, 6: Fast2
@@ -48,25 +43,74 @@
  * @max 6
  * @type Number
  *
- * @param show hp gauge
- * @parent basic default configuration
- * @text Show Hp Gauge
+ * @param Show Hp Gauge
+ * @parent Basic Default Configuration
  * @desc Show the hp gauge of the units
  * @default true
  * @on Yes
  * @off No
  * @type Boolean
  *
+ * @param Text Manager
+ *
+ * @param Cursor Speed Term
+ * @parent Text Manager
+ * @desc The cursor speed term.
+ * @default Cursor Speed
+ *
+ * @param Show Map Grid Term
+ * @parent Text Manager
+ * @desc The show map grid term.
+ * @default Show Map Grid
+ *
+ * @param Auto Turn End Term
+ * @parent Text Manager
+ * @desc The auto turn end term.
+ * @default Auto Turn End
+ *
+ * @param Unit Speed Term
+ * @parent Text Manager
+ * @desc The unit speed term.
+ * @default Unit Speed
+ *
+ * @param Show Hp Gauge Term
+ * @parent Text Manager
+ * @desc The show hp gauge term.
+ * @default Show Hp Gauge
+ *
  */
+
+/**
+ * Converts a boolean string.
+ *
+ * @method String.prototype.toBoolean
+ * @return {Boolean} A boolean of string
+ */
+String.prototype.toBoolean = function(){
+    var s = String(this);
+    switch (s) {
+    case 'true':
+        return true;
+    case 'false':
+        return false;
+    default:
+        return Boolean(this);
+    }
+};
 
 var TacticsConfig = TacticsConfig || {};
 TacticsConfig.Parameters = PluginManager.parameters('TacticsConfig');
 
-TacticsConfig.cursorSpeed = Number(TacticsConfig.Parameters['cursor speed']);
-TacticsConfig.showMapGrid = Boolean(TacticsConfig.Parameters['show map grid']);
-TacticsConfig.autoTurnEnd = Boolean(TacticsConfig.Parameters['auto turn end']);
-TacticsConfig.unitSpeed =   Number(TacticsConfig.Parameters['unit speed']);
-TacticsConfig.showHpGauge = Boolean(TacticsConfig.Parameters['show hp gauge']);
+TacticsConfig.cursorSpeed =     Number(TacticsConfig.Parameters['Cursor Speed']);
+TacticsConfig.showMapGrid =     TacticsConfig.Parameters['Show Map Grid'].toBoolean();
+TacticsConfig.autoTurnEnd =     TacticsConfig.Parameters['Auto Turn End'].toBoolean();
+TacticsConfig.unitSpeed =       Number(TacticsConfig.Parameters['Unit Speed']);
+TacticsConfig.showHpGauge =     TacticsConfig.Parameters['Show Hp Gauge'].toBoolean();
+TacticsConfig.cursorSpeedTerm = String(TacticsConfig.Parameters['Cursor Speed Term']);
+TacticsConfig.showMapGridTerm = String(TacticsConfig.Parameters['Show Map Grid Term']);
+TacticsConfig.autoTurnEndTerm = String(TacticsConfig.Parameters['Auto Turn End Term']);
+TacticsConfig.unitSpeedTerm =   String(TacticsConfig.Parameters['Unit Speed Term']);
+TacticsConfig.showHpGaugeTerm = String(TacticsConfig.Parameters['Show Hp Gauge Term']);
 
 //-----------------------------------------------------------------------------
 // ConfigManager
@@ -77,7 +121,6 @@ ConfigManager.cursorSpeed3 = TacticsConfig.cursorSpeed;
 ConfigManager.showMapGrid =  TacticsConfig.showMapGrid;
 ConfigManager.autoTurnEnd =  TacticsConfig.autoTurnEnd;
 ConfigManager.unitSpeed5 =   TacticsConfig.unitSpeed;
-console.log(TacticsConfig.showHpGauge);
 ConfigManager.showHpGauge =  TacticsConfig.showHpGauge;
 
 TacticsConfig.makeData = ConfigManager.makeData;
@@ -88,7 +131,6 @@ ConfigManager.makeData = function() {
     config.unitSpeed5 = this.unitSpeed5;
     config.cursorSpeed3 = this.cursorSpeed3;
     config.showHpGauge = this.showHpGauge;
-    console.log(TacticsConfig.showHpGauge);
     return config;
 };
 
@@ -100,7 +142,6 @@ ConfigManager.applyData = function(config) {
     this.unitSpeed5 = this.readVariable5(config, 'unitSpeed5');
     this.cursorSpeed3 = this.readVariable3(config, 'cursorSpeed3');
     this.showHpGauge = this.readFlag(config, 'showHpGauge');
-    console.log(TacticsConfig.showHpGauge);
 };
 
 ConfigManager.readVariable5 = function(config, name) {
@@ -125,27 +166,23 @@ ConfigManager.refresh = function() {
     $gameTroopTS.refresh();
 };
 
-ConfigManager.readFlag = function(config, name) {
-    return TacticsConfig[name] || !!config[name];
-};
-
 //-----------------------------------------------------------------------------
 // Window_Options
 //
 // The window for changing various settings on the options screen.
 
+TacticsConfig.Window_Options_makeCommandList = Window_Options.prototype.makeCommandList;
 Window_Options.prototype.makeCommandList = function() {
-    this.addGeneralOptions();
-    this.addVolumeOptions();
-    this.addCustomOptions();
+    TacticsConfig.Window_Options_makeCommandList.call(this);
+    this.addTacticsOptions();
 };
 
-Window_Options.prototype.addCustomOptions = function() {
-    this.addCommand('Auto turn end', 'autoTurnEnd');
-    this.addCommand('Show Map Grid', 'showMapGrid');
-    this.addCommand('Unit speed', 'unitSpeed5');
-    this.addCommand('Cursor speed', 'cursorSpeed3');
-    this.addCommand('Show unit Hp', 'showHpGauge');
+Window_Options.prototype.addTacticsOptions = function() {
+    this.addCommand(TacticsConfig.autoTurnEndTerm, 'autoTurnEnd');
+    this.addCommand(TacticsConfig.showMapGridTerm, 'showMapGrid');
+    this.addCommand(TacticsConfig.unitSpeedTerm, 'unitSpeed5');
+    this.addCommand(TacticsConfig.cursorSpeedTerm, 'cursorSpeed3');
+    this.addCommand(TacticsConfig.showHpGaugeTerm, 'showHpGauge');
 };
 
 TacticsConfig.Window_Options_statusText  = Window_Options.prototype.statusText ;
@@ -237,19 +274,6 @@ Window_Options.prototype.cursorLeft = function(wrap) {
     }
 };
 
-Window_Options.prototype.volumeOffset = function() {
-    return 10;
-};
-
-Window_Options.prototype.changeValue = function(symbol, value) {
-    var lastValue = this.getConfigValue(symbol);
-    if (lastValue !== value) {
-        this.setConfigValue(symbol, value);
-        this.redrawItem(this.findSymbol(symbol));
-        SoundManager.playCursor();
-    }
-};
-
 Window_Options.prototype.getConfigValue = function(symbol) {
     return ConfigManager[symbol];
 };
@@ -270,13 +294,30 @@ Scene_Options.prototype.terminate = function() {
 };
 
 //-----------------------------------------------------------------------------
-// Game_Actor
+// BattleManagerTS
 //
-// The game object class for an actor.
+// The static class that manages battle progress.
 
-TacticsConfig.Game_Actor_setupEvent = Game_Actor.prototype.setupEvent;
-Game_Actor.prototype.setupEvent = function(eventId) {
-    TacticsConfig.Game_Actor_setupEvent.call(this, eventId);
+TacticsConfig.BattleManagerTS_updateStartPlayer = BattleManagerTS.updateStartPlayer;
+BattleManagerTS.updateStartPlayer = function() {
+    TacticsConfig.BattleManagerTS_updateStartPlayer.call(this);
+    if (!this._subject && !$gamePartyTS.isPhase()) {
+        if (!ConfigManager.autoTurnEnd) {
+            $gameSelectorTS.setTransparent(false);
+            this._battlePhase = 'explore';
+        }
+    }
+};
+
+//-----------------------------------------------------------------------------
+// Game_Battler
+//
+// The superclass of Game_Actor and Game_Enemy. It contains methods for sprites
+// and actions.
+
+TacticsConfig.Game_Battler_setupEvent = Game_Battler.prototype.setupEvent;
+Game_Battler.prototype.setupEvent = function(eventId) {
+    TacticsConfig.Game_Battler_setupEvent.call(this, eventId);
     this.event().setMoveSpeed(ConfigManager.unitSpeed5);
 };
 
@@ -335,29 +376,5 @@ Sprite_HpGaugeTS.prototype.update = function(battler) {
     TacticsConfig.Sprite_HpGaugeTS_update.call(this, battler)
     if (!ConfigManager.showHpGauge) {
         this.bitmap.clear();
-    }
-};
-
-TacticsConfig.BattleManagerTS_updateStartPlayer = BattleManagerTS.updateStartPlayer;
-BattleManagerTS.updateStartPlayer = function() {
-    if (this.isPlayerPhase() && this.isTurnEnd()) {
-        if (!ConfigManager.autoTurnEnd) {
-            $gameSelectorTS.setTransparent(false);
-            this._battlePhase = 'explore';
-        }
-    } else {
-        TacticsConfig.BattleManagerTS_updateStartPlayer.call(this);
-    }
-};
-
-BattleManagerTS.updateStartPlayer = function() {
-    this._subject = this._playersOrder.shift();
-    if (this._subject) {
-        this.restrictedPhase();
-    } else if ($gamePartyTS.isPhase()) {
-        $gameSelectorTS.setTransparent(false);
-        this._battlePhase = 'explore';
-    } else {
-        this._battlePhase = 'turnEnd';
     }
 };
