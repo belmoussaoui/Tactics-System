@@ -3,37 +3,92 @@
 //=============================================================================
 
 /*:
- * @plugindesc Adds basic configuration data.
+ * @plugindesc Adds basic configuration data for the player.
  * Requires: TacticsSystem.js
  * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
+ *
+ * @param basic default configuration
+ * @text Basic Default Configuration
+ * @desc Parameters related to player character.
+ *
+ * @param cursor speed
+ * @parent basic default configuration
+ * @text The cursor Speed
+ * @desc The cursor speed. 1: Slow, 2: Normal, 3: Fast
+ * @default 2
+ * @min 1
+ * @max 3
+ * @type Number
+ *
+ * @param show map grid
+ * @parent basic default configuration
+ * @text Show Map Grid
+ * @desc Show the grid of the battle scene.
+ * @default true
+ * @on Yes
+ * @off No
+ * @type Boolean
+ *
+ * @param auto turn end
+ * @parent basic default configuration
+ * @text Auto Turn End
+ * @desc Automatically end the player's turn.
+ * @default true
+ * @on Yes
+ * @off No
+ * @type Boolean
+ *
+ * @param unit speed
+ * @parent basic default configuration
+ * @text Unit Speed
+ * @desc The moving speed of the units.
+ * 1: Slow1, 2: Slow2, 3: Slow3 4: Norm, 5: Fast1, 6: Fast2
+ * @default 3
+ * @min 1
+ * @max 6
+ * @type Number
+ *
+ * @param show hp gauge
+ * @parent basic default configuration
+ * @text Show Hp Gauge
+ * @desc Show the hp gauge of the units
+ * @default true
+ * @on Yes
+ * @off No
+ * @type Boolean
+ *
  */
 
 var TacticsConfig = TacticsConfig || {};
 TacticsConfig.Parameters = PluginManager.parameters('TacticsConfig');
+
+TacticsConfig.cursorSpeed = Number(TacticsConfig.Parameters['cursor speed']);
+TacticsConfig.showMapGrid = Boolean(TacticsConfig.Parameters['show map grid']);
+TacticsConfig.autoTurnEnd = Boolean(TacticsConfig.Parameters['auto turn end']);
+TacticsConfig.unitSpeed =   Number(TacticsConfig.Parameters['unit speed']);
+TacticsConfig.showHpGauge = Boolean(TacticsConfig.Parameters['show hp gauge']);
 
 //-----------------------------------------------------------------------------
 // ConfigManager
 //
 // The static class that manages the configuration data.
 
-ConfigManager.autoTurnEnd       = false;
-ConfigManager.mapGrid           = true;
-ConfigManager.unitSpeed5        = 3;
-ConfigManager.cursorSpeed3      = TacticsSystem.cursorSpeed;
-ConfigManager.showHpGauge       = TacticsSystem.showHpGauge;
+ConfigManager.cursorSpeed3 = TacticsConfig.cursorSpeed;
+ConfigManager.showMapGrid =  TacticsConfig.showMapGrid;
+ConfigManager.autoTurnEnd =  TacticsConfig.autoTurnEnd;
+ConfigManager.unitSpeed5 =   TacticsConfig.unitSpeed;
+console.log(TacticsConfig.showHpGauge);
+ConfigManager.showHpGauge =  TacticsConfig.showHpGauge;
 
+TacticsConfig.makeData = ConfigManager.makeData;
 ConfigManager.makeData = function() {
-    var config = {};
-    config.commandRemember = this.commandRemember;
-    config.bgmVolume = this.bgmVolume;
-    config.bgsVolume = this.bgsVolume;
-    config.meVolume = this.meVolume;
-    config.seVolume = this.seVolume;
+    var config = TacticsConfig.makeData.call(this);
     config.autoTurnEnd = this.autoTurnEnd;
-    config.mapGrid = this.showMapGrid;
+    config.showMapGrid = this.showMapGrid;
     config.unitSpeed5 = this.unitSpeed5;
     config.cursorSpeed3 = this.cursorSpeed3;
     config.showHpGauge = this.showHpGauge;
+    console.log(TacticsConfig.showHpGauge);
     return config;
 };
 
@@ -45,6 +100,7 @@ ConfigManager.applyData = function(config) {
     this.unitSpeed5 = this.readVariable5(config, 'unitSpeed5');
     this.cursorSpeed3 = this.readVariable3(config, 'cursorSpeed3');
     this.showHpGauge = this.readFlag(config, 'showHpGauge');
+    console.log(TacticsConfig.showHpGauge);
 };
 
 ConfigManager.readVariable5 = function(config, name) {
@@ -67,6 +123,10 @@ ConfigManager.refresh = function() {
     $gameSelectorTS.refresh();
     $gamePartyTS.refresh();
     $gameTroopTS.refresh();
+};
+
+ConfigManager.readFlag = function(config, name) {
+    return TacticsConfig[name] || !!config[name];
 };
 
 //-----------------------------------------------------------------------------
