@@ -149,9 +149,13 @@ Scene_BattleTS.prototype.initialize = function() {
 CombatScene.Scene_BattleTS_update = Scene_BattleTS.prototype.update;
 Scene_BattleTS.prototype.update = function() {
     CombatScene.Scene_BattleTS_update.call(this);
-    if (this.isSceneChangeOk() && BattleManagerTS.isStartCombat()) {
-        SceneManager.push(Scene_Combat);
-    } else if (SceneManager.isNextScene(Scene_Combat)) {
+    var action = BattleManagerTS.inputtingAction()
+    if (action && action.needCombatScene()) {
+        if (this.isSceneChangeOk() && BattleManagerTS.isStartCombat()) {
+            SceneManager.push(Scene_Combat);
+        }
+    }
+    if (SceneManager.isNextScene(Scene_Combat)) {
         this.updateEncounterEffect();
     }
 };
@@ -205,7 +209,7 @@ BattleManagerTS.initMembers = function() {
 CombatScene.BattleManagerTS_setupAction = BattleManagerTS.setupAction;
 BattleManagerTS.setupAction = function() {
     CombatScene.BattleManagerTS_setupAction.call(this);
-    if (this._action && this._action.isValid() && !this._action.isWait()) {
+    if (this._action && this._action.isValid()) {
         var target = this._targets[0];
         $gameSelectorTS.performTransfer(target.x, target.y);
         this._startCombat = true;
@@ -221,8 +225,8 @@ BattleManagerTS.updateClose = function() {
 };
 
 BattleManagerTS.checkCombatEnd = function() {
+    this._startCombat = false;
     if (SceneManager.isPreviousScene(Scene_BattleTS)) {
-        this._startCombat = false;
         $gameSelectorTS.savePosition();
         SceneManager.pop();
         return true;
@@ -268,6 +272,16 @@ Game_SelectorTS.prototype.isBusy = function() {
         return false
     }
     return CombatScene.Game_SelectorTS_isBusy.call(this);
+};
+
+
+//-----------------------------------------------------------------------------
+// Game_Action
+//
+// The game object class for a battle action.
+
+Game_Action.prototype.needCombatScene = function() {
+    return !this.isGuard() && !this.isWait();
 };
 
 //-----------------------------------------------------------------------------

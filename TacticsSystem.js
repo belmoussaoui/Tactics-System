@@ -533,7 +533,7 @@ Scene_BattleTS.prototype.commandSkill = function() {
 Scene_BattleTS.prototype.commandGuard = function() {
     BattleManagerTS.inputtingAction().setGuard();
     this._actorCommandWindow.close();
-    BattleManagerTS.processAction();
+    BattleManagerTS.setupAction();
 };
 
 Scene_BattleTS.prototype.commandItem = function() {
