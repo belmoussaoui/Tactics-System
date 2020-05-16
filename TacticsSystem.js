@@ -1417,7 +1417,7 @@ BattleManagerTS.processCancel = function() {
 };
 
 BattleManagerTS.checkBattleEnd = function() {
-    if (this._phase && this._battlePhase === 'close') {
+    if (this._phase) {
         if ($gamePartyTS.isAllDead()) {
             this.processDefeat();
             return true;
@@ -2340,7 +2340,7 @@ Window_BattleInfoTS.prototype.open = function(battlerTS) {
     Window_Base.prototype.open.call(this);
 };
 
-Window_Status.prototype.refresh = function() {
+Window_BattleInfoTS.prototype.refresh = function() {
     this.contents.clear();
     if (this._actor) {
         var lineHeight = this.lineHeight();
@@ -4549,8 +4549,8 @@ Game_Event.prototype.isAppeared = function() {
 
 TacticsSystem.Game_Event_update = Game_Event.prototype.update;
 Game_Event.prototype.update = function() {
+    this.updateAppeared();
     TacticsSystem.Game_Event_update.call(this);
-    this.updateAppeared()
 };
 
 Game_Event.prototype.updateAppeared = function() {
