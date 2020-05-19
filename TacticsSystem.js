@@ -3746,8 +3746,15 @@ Game_Battler.prototype.currentBattler = function() {
     return null;
 };
 
+Game_Battler.prototype.currentData = function() {
+    return [this.currentBattler(), this.dataEvent()];
+};
+
 Game_Battler.prototype.tparam = function(paramString) {
-    var param = this.currentBattler().meta[paramString] || this.dataEvent().meta[paramString];
+    var param = null;
+    for (var i = 0; i < this.currentData().length; i++) {
+        param = this.currentData()[i].meta[paramString]
+    }
     if (param) {
         param.replace(/\s/g, '');
     }
@@ -3978,6 +3985,10 @@ TacticsSystem.Game_Actor_initMembers = Game_Actor.prototype.initMembers;
 Game_Actor.prototype.initMembers = function() {
     TacticsSystem.Game_Actor_initMembers.call(this);
     this._actionsButton = [];
+};
+
+Game_Actor.prototype.currentData = function() {
+    return Game_Battler.prototype.currentData.call(this).concat(this.currentClass());
 };
 
 Game_Actor.prototype.setupEvent = function(eventId) {
