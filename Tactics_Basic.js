@@ -4,8 +4,9 @@
 
 /*:
  * @plugindesc A Tactical Battle System designed for RPG Maker.
- * Requires: Selector.png in img/picture.
  * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
+ *
+ * @requiredAssets system/Selector
  *
  * @param Basic Parameters
  *
@@ -129,12 +130,12 @@
  * @desc The drain abbrevation term.
  * @default Drain
  *
- * @param Hit Rate Term (abbr.)
+ * @param Hit Rate Term
  * @parent Text Manager
  * @desc The hit rate abbrevation term.
  * @default Hit Rate
  *
- * @param Critical Rate Term (abbr.)
+ * @param Critical Rate Term
  * @parent Text Manager
  * @desc The critical rate abbrevation term.
  * @default Cri Rate
@@ -200,19 +201,76 @@
  * @type Number
  *
  * @help
+ * -----------------------------------------------------------------------------
+ * Basics
  *
- * For more information, please consult :
- *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system-1-0.117600/
- * Plugin Command:
- *   TacticsSystem.battleProcessing [ON/OFF] # Activate or desactivate the system.
- *   TacticsSystem.battleWin                 # Proceed immediately to the victory of the battle.
- *   TacticsSystem.battleLose                # Proceed immediately to the defeat of the battle.
- *   TacticsSystem.selectorMoveTo x y        # Move the selector to position x and y.
- *   TacticsSystem.selectorTransfer x y      # Move immediately the selector to position x and y.
- *   TacticsSystem.selectorEvent eventId     # Move immediately the selector to position at event of eventId.
- *   TacticsSystem.clearAll [ON/OFF]         # Activate or desactivate clear all condition victory.
- *   TacticsSystem.actorTurnEnd              # Ends the subject's turn.
+ * Use the Battle Processing command of an event (with parallel trigger)
+ * to start a tactics battle in the current map.
+ * You can't start a battle on another map or without transition.
+ *
+ * You can define the actors of the battle by creating events with the note
+ * <actor:actorId> or with the note <party:index> to directly use a member
+ * of the party.
+ *
+ * You can define the enemies of the battle by creating events with the note
+ * <enemy:enemyId>. You can in addition to this tag add <troop:id> to bind
+ * the event to enemy in troops of the database. This will allow you to create
+ * events with the conditions of the battle.
+ *
+ * -----------------------------------------------------------------------------
+ * Note Tag
+ *
+ * There are several note tags to define parameters specific to the
+ * Tactics System.
+ *
+ * <mvp:int> [events, actors, classes, enemies] (MoVe Point)
+ *    Defines the movement distance of a unit.
+ *
+ * <agg:int> [events, enemies] (AGGresivity)
+ *    Set the distance of action of an enemy. Setting it to 1 allows
+ *    to create enemies that don't move.s
+ *
+ * <range:diamond int>, <range:line int>, <range:rectangle int>,
+ * <range:[[x1, y1], [x2, y2], ..., [xn, yn]] [skills, item]
+ *    Set the range of an action.
+ *
+ * -----------------------------------------------------------------------------
+ * Plugin Command
+ *
+ * TacticsSystem.BattleProcessing on/off
+ *     Activate or desactivate the system.
+ *
+ * TacticsSystem.BattleWin
+ *     Proceed immediately to the victory of the battle.
+ *
+ * TacticsSystem.battleLose
+ *     Proceed immediately to the defeat of the battle.
+ *
+ * TacticsSystem.selectorMoveTo x y
+ *     Move the selector to position x and y.
+ *
+ * TacticsSystem.selectorTransfer x y
+ *     Move immediately the selector to position x and y.
+ *
+ * TacticsSystem.selectorEvent eventId
+ *     Move immediately the selector to position at event of eventId.
+ *
+ * TacticsSystem.clearAll on/off
+ *     Activate or desactivate clear all condition victory.
+ *
+ * TacticsSystem.actorTurnEnd
+ *     Ends the subject's turn.
+ *
+ * -----------------------------------------------------------------------------
+ * Help
+ * If you encounter a error, please report it in the following thread :
+ *     https://forums.rpgmakerweb.com/index.php?threads/tactics-system-1-0.117600/
  */
+
+var TacticsSystem = TacticsSystem || {};
+TacticsSystem.Parameters = PluginManager.parameters('Tactics_Basic');
+TacticsSystem.isActive = true;
+TacticsSystem.clearAll = true;
 
  /**
  * Converts a boolean string.
@@ -229,11 +287,6 @@ String.prototype.toBoolean = function(){
         return true;
     }
 };
-
-var TacticsSystem = TacticsSystem || {};
-TacticsSystem.Parameters = PluginManager.parameters('Tactics_Basic');
-TacticsSystem.isActive = true;
-TacticsSystem.clearAll = true;
 
 TacticsSystem.cursorSpeed =           Number(TacticsSystem.Parameters['Cursor Speed']);
 TacticsSystem.gridOpacity =           Number(TacticsSystem.Parameters['Grid Opacity']);
@@ -253,7 +306,7 @@ TacticsSystem.endTurnTerm =           String(TacticsSystem.Parameters['End Turn 
 TacticsSystem.damageTerm =            String(TacticsSystem.Parameters['Damage Term']);
 TacticsSystem.recoverTerm =           String(TacticsSystem.Parameters['Recover Term']);
 TacticsSystem.drainTerm =             String(TacticsSystem.Parameters['Drain Term']);
-TacticsSystem.hitRateTerm =           String(TacticsSystem.Parameters['Hit Rate term']);
+TacticsSystem.hitRateTerm =           String(TacticsSystem.Parameters['Hit Rate Term']);
 TacticsSystem.criticalRateTerm =      String(TacticsSystem.Parameters['Critical Rate Term']);
 TacticsSystem.wait =                  String(TacticsSystem.Parameters['Wait Command Name']);
 TacticsSystem.battleStartId =         Number(TacticsSystem.Parameters['Battle Start Id']);
@@ -269,58 +322,36 @@ TacticsSystem.turnCountVarId =        Number(TacticsSystem.Parameters['Turn Coun
     Game_Interpreter.prototype.pluginCommand = function(command, args) {
         TacticsSystem.Game_Interpreter_pluginCommand.call(this, command, args);
         switch(command) {
-            case 'TacticsSystem.battleProcessing':
-                if (args[0].toUpperCase() === 'ON') {
-                    TacticsSystem.isActive = true;
-                }
-                if (args[0].toUpperCase() === 'OFF') {
-                    TacticsSystem.isActive = false;
-                }
+            case 'TacticsSystem.BattleProcessing':
+                this.battleProcessing(args[0]);
                 break;
-            case 'TacticsSystem.battleWin':
-                TacticsManager.processVictory();
+            case 'TacticsSystem.ProcessVictory':
+                this.processVictory();
                 break;
-            case 'TacticsSystem.battleLose':
-                TacticsSystem.isDefeated = true;
-                TacticsManager.processDefeat();
+            case 'TacticsSystem.ProcessDefeat':
+                this.processDefeat();
                 break;
-            case 'TacticsSystem.selectorTransfer':
-                $gameSelector.performTransfer(Number(args[0]), Number(args[1]));
-                this.setWaitMode('TacticsSystem.selector');
+            case 'TacticsSystem.ClearAll':
+                this.clearAll(args[0]);
                 break;
-            case 'TacticsSystem.selectorMoveTo':
-                $gameSelector.moveTo(Number(args[0]), Number(args[1]));
-                this.setWaitMode('TacticsSystem.selector');
+            case 'TacticsSystem.SelectorActive':
+                this.selectorActive(args[0]);
                 break;
-            case 'TacticsSystem.selectorEvent':
-                var eventId = Number(args[0]);
-                var event = $gameMap.event(eventId);
-                $gameSelector.performTransfer(event.x, event.y);
-                this.setWaitMode('TacticsSystem.selector');
+            case 'TacticsSystem.SelectorTransfer':
+                this.selectorTransfer(args[0], args[1]);
                 break;
-            case 'TacticsSystem.selectorActive':
-                 if (args[0].toUpperCase() === 'ON') {
-                    $gameSelector.activate();
-                }
-                if (args[0].toUpperCase() === 'OFF') {
-                    $gameSelector.deactivate();
-                }
+            case 'TacticsSystem.SelectorMoveTo':
+                this.selectorMoveTo(args[0], args[1]);
                 break;
-            case 'TacticsSystem.clearAll':
-                if (args[0].toUpperCase() === 'ON') {
-                    TacticsSystem.clearAll = true;
-                }
-                if (args[0].toUpperCase() === 'OFF') {
-                    TacticsSystem.clearAll = false;
-                }
+            case 'TacticsSystem.SelectorEvent':
+                this.selectorEvent(args[0]);
                 break;
-            case 'TacticsSystem.actorTurnEnd':
-                TacticsManager.endAction();
+            case 'TacticsSystem.UnitEndAction':
+                TacticsManager.unitEndAction();
                 break;
         }
     };
 })();
-
 
 //-----------------------------------------------------------------------------
 /**
@@ -421,6 +452,7 @@ TacticsManager.setup = function(troopId, canEscape, canLose) {
     this._canEscape = canEscape;
     this._canLose = canLose;
     this.makeEscapeRatio();
+    $gameTroop.setup(troopId);
     $gameSwitches.update();
     $gameVariables.update();
     var x = $gamePlayer.x;
@@ -483,9 +515,7 @@ TacticsManager.addGameParty = function(event) {
 
 TacticsManager.addGameEnemy = function(event) {
     var enemyId = Number(event.tparam('enemy'));
-    // move in game troop ts
-    var enemy = new Game_Enemy(enemyId);
-    $gameTroopTs.addEnemy(enemy, event);
+    $gameTroopTs.addEnemy(enemyId, event);
 };
 
 TacticsManager.setEventCallback = function(callback) {
@@ -701,7 +731,7 @@ TacticsManager.allBattlerMembers = function() {
 };
 
 TacticsManager.actor = function() {
-    return this._actorIndex >= 0 ?  $gamePartyTs.members()[this._actorIndex] : null;
+    return this._actorIndex >= 0 ? $gamePartyTs.members()[this._actorIndex] : null;
 };
 
 TacticsManager.makePlayerOrders = function() {
@@ -752,7 +782,7 @@ TacticsManager.selectActor = function(actor) {
     $gameSelector.updateSelect();
     this._subject = actor;
     this._subject.performSelect();
-    this._actorIndex = this._subject.indexTS();
+    this._actorIndex = this._subject.indexTs();
     this._subject.savePosition();
     $gameParty.setupTactics([this._subject]);
     this.refreshMoveTiles();
@@ -761,6 +791,7 @@ TacticsManager.selectActor = function(actor) {
 TacticsManager.updateSelect = function() {
     var x = $gameSelector.x;
     var y = $gameSelector.y;
+    this.refreshEnemyWindow($gameSelector.select());
     if ($gameSelector.isMoving()) {
         this._subject.refreshMovesAction(x, y);
     }
@@ -795,7 +826,6 @@ TacticsManager.processTarget = function() {
 };
 
 TacticsManager.updateTarget = function() {
-    this._actorWindow.close();
     if ($gameSelector.isMoving()) {
         this.refreshTarget();
     }
@@ -826,11 +856,24 @@ TacticsManager.inputtingAction = function() {
 TacticsManager.refreshSubject = function() {
     var select = $gameSelector.select();
     if ($gameSelector.isMoving()) {
-        if (select && select.isAlive()) {
-            this._actorWindow.open(select);
-        } else {
-            this._actorWindow.close();
-        }
+        this.refreshActorWindow(select);
+        this.refreshEnemyWindow(select);
+    }
+};
+
+TacticsManager.refreshActorWindow = function(select) {
+    if (select && select.isAlive() && select.isActor()) {
+        this._actorWindow.open(select);
+    } else {
+        this._actorWindow.close();
+    }
+};
+
+TacticsManager.refreshEnemyWindow = function(select) {
+    if (select && select.isAlive() && select.isEnemy()) {
+        this._enemyWindow.open(select);
+    } else {
+        this._enemyWindow.close();
     }
 };
 
@@ -847,6 +890,7 @@ TacticsManager.refreshTarget = function() {
 
 TacticsManager.refreshInfo = function() {
     var select = $gameSelector.select();
+    this.refreshEnemyWindow(select);
     var action = this.inputtingAction();
     if (action.isTargetValid(select)) {
         this._infoWindow.open(select);
@@ -922,7 +966,7 @@ TacticsManager.updateMove = function() {
             this._subject.nextMove();
         }
         if (!action || !action.isMove()){
-            if (this._subject.canInput()) {
+            if (this._subject.canInput() && this._subject.isActor()) {
                 this._battlePhase = 'input';
             } else {
                 this.setupAction();
@@ -1013,18 +1057,12 @@ TacticsManager.setDirectionTargets = function() {
     }, this);
 };
 
-TacticsManager.restoreDirectionTargets = function() {
-    this._targets.forEach(function(target) {
-        target.event().setDirection(2);
-    }, this);
-};
-
 TacticsManager.nextAction = function() {
-    this.restoreDirectionTargets();
     if (this._subject.canNextAction()) {
         this.processCancel();
         this._enemyWindow.close();
         this._infoWindow.close();
+        this._actorWindow.open();
         this._battlePhase = 'input';
     } else {
         this.processAction();
@@ -1305,7 +1343,7 @@ TacticsManager.terminate = function() {
     $gamePlayer.setThrough(false);
     $gamePlayer.refresh();
     // fade out battle argument
-    //$gameScreen.onBattleEnd();
+    $gameScreen.onBattleEnd();
     $gamePartyTs.onBattleEnd();
     $gameTroopTs.onBattleEnd();
     $gamePartyTs.clear();
@@ -1318,6 +1356,12 @@ TacticsManager.terminate = function() {
 // The game object class for screen effect data, such as changes in color tone
 // and flashes.
 
+TacticsSystem.Game_Screen_clear = Game_Screen.prototype.clear;
+Game_Screen.prototype.clear = function() {
+    TacticsSystem.Game_Screen_clear.call(this);
+    this._battleStart = true;
+};
+
 TacticsSystem.Game_Screen_onBattleStart = Game_Screen.prototype.onBattleStart;
 Game_Screen.prototype.onBattleStart = function() {
     TacticsSystem.Game_Screen_onBattleStart.call(this);
@@ -1325,7 +1369,8 @@ Game_Screen.prototype.onBattleStart = function() {
 };
 
 Game_Screen.prototype.clearStart = function() {
-    this._startDuration = TacticsSystem.durationStartSprite;
+    this._startDuration = this._battleStart ? TacticsSystem.durationStartSprite : 0;
+    this._battleStart = false;
 };
 
 Game_Screen.prototype.startDuration = function() {
@@ -1344,6 +1389,10 @@ Game_Screen.prototype.updateStart = function() {
     }
 };
 
+Game_Screen.prototype.onBattleEnd = function() {
+    this._battleStart = true;
+};
+
 //-----------------------------------------------------------------------------
 // Game_Temp
 //
@@ -1354,6 +1403,7 @@ Game_Temp.prototype.initialize = function() {
     TacticsSystem.Game_Temp_initialize.call(this);
     this._positionX = null;
     this._positionY = null;
+    this._direction = null;
     this._canCancel = true;
 };
 
@@ -1365,6 +1415,18 @@ Game_Temp.prototype.isPositionValid = function(x, y) {
 Game_Temp.prototype.setPosition = function(x, y) {
     this._positionX = x;
     this._positionY = y;
+};
+
+Game_Temp.prototype.setDirection = function(d) {
+    this._direction = d;
+};
+
+Game_Temp.prototype.direction = function() {
+    return this._direction;
+};
+
+Game_Temp.prototype.clearDirection = function() {
+    this._direction = null;
 };
 
 Game_Temp.prototype.clearPosition = function() {
@@ -1731,9 +1793,14 @@ Game_Battler.prototype.initMembers = function() {
 
 Game_Battler.prototype.setupEvent = function(eventId) {
     this._eventId = eventId;
-    this._tx = this.event().x;
-    this._ty = this.event().y;
-    this.event().setBattler(this);
+    var event = this.event()
+    this._tx = event.x;
+    this._ty = event.y;
+    event.setBattler(this);
+};
+
+Game_Battler.prototype.indexTs = function() {
+    return -1;
 };
 
 Game_Battler.prototype.clearEvent = function() {
@@ -1777,7 +1844,6 @@ Game_Battler.prototype.onTurnStart = function() {
 
 Game_Battler.prototype.onActionEnd = function() {
     this._canAction = false;
-    //this.event().setDirection(2);
 };
 
 Game_Battler.prototype.isMoving = function() {
@@ -1983,7 +2049,8 @@ Game_Battler.prototype.setPosition = function(x, y) {
 };
 
 Game_Battler.prototype.canNextAction = function() {
-    return this.isActor() && this.nextAction() && !this.isAutoBattle();
+    // next action in first for game enemy get next action!
+    return this.nextAction() && this.isActor() && !this.isAutoBattle();
 };
 
 //-----------------------------------------------------------------------------
@@ -2008,7 +2075,7 @@ Game_Actor.prototype.currentBattler = function() {
     return this.actor();
 };
 
-Game_Actor.prototype.indexTS = function() {
+Game_Actor.prototype.indexTs = function() {
     return $gamePartyTs.members().indexOf(this);
 };
 
@@ -2022,13 +2089,14 @@ Game_Actor.prototype.opponentsUnitTS = function() {
 
 Game_Actor.prototype.savePosition = function() {
     $gameTemp.setPosition(this.x, this.y);
+    $gameTemp.setDirection(this.event().direction());
 };
 
 Game_Actor.prototype.restorePosition = function() {
     var positionX = $gameTemp.positionX();
     var positionY = $gameTemp.positionY();
     this.event().setPosition(positionX, positionY);
-    this.event().setDirection(2);
+    this.event().setDirection($gameTemp.direction());
     this._tx = positionX;
     this._ty = positionY;
 };
@@ -2175,6 +2243,9 @@ Game_Enemy.prototype.opponentsUnitTS = function() {
     return $gamePartyTs;
 };
 
+Game_Enemy.prototype.indexTs = function() {
+    return $gameTroopTs.members().indexOf(this);
+};
 
 Game_Enemy.prototype.makeMoves = function() {
     Game_Battler.prototype.makeMoves.call(this);
@@ -2185,6 +2256,7 @@ Game_Enemy.prototype.makeMoves = function() {
 };
 
 Game_Enemy.prototype.findAction = function() {
+    // Rewrite this if you want to change the target search behavior.
     this._rate = 0;
     var saveX = this.tx;
     var saveY = this.ty;
@@ -2278,23 +2350,6 @@ Game_Party.prototype.memberId = function(partyId) {
 
 Game_Troop.prototype.setupTactics = function(enemies) {
     this._enemies = enemies;
-    //this.makeUniqueNames();
-};
-
-TacticsSystem.Game_Troop_increaseTurn = Game_Troop.prototype.increaseTurn;
-Game_Troop.prototype.increaseTurn = function() {
-    if (this._troopId > 0) {
-        TacticsSystem.Game_Troop_increaseTurn.call(this);
-    } else {
-        this._turnCount++;
-    }
-};
-
-TacticsSystem.Game_Troop_setupBattleEvent = Game_Troop.prototype.setupBattleEvent;
-Game_Troop.prototype.setupBattleEvent = function() {
-    if (this._troopId > 0) {
-        TacticsSystem.Game_Troop_setupBattleEvent.call(this);
-    }
 };
 
 TacticsSystem.Game_Troop_meetsConditions = Game_Troop.prototype.meetsConditions;
@@ -2374,10 +2429,10 @@ Game_Map.prototype.color = function() {
 };
 
 Game_Map.prototype.performScroll = function(x, y) {
-    var x = Math.floor(Math.min(x, $gameMap.width() - this.screenTileX()/2));
-    var y = Math.floor(Math.min(y, $gameMap.height() - this.screenTileY()/2));
-    this._destinationX = Math.round(Math.max(x - this.screenTileX()/2, 0));
-    this._destinationY = Math.round(Math.max(y - this.screenTileY()/2, 0));
+    var x = Math.floor(Math.min(x, $gameMap.width() - this.screenTileX() / 2));
+    var y = Math.floor(Math.min(y, $gameMap.height() - this.screenTileY() / 2));
+    this._destinationX = Math.round(Math.max(x - this.screenTileX() / 2, 0));
+    this._destinationY = Math.round(Math.max(y - this.screenTileY() / 2, 0));
     this._scrollSpeed = 5;
 };
 
@@ -2396,16 +2451,20 @@ Game_Map.prototype.updateScroll = function() {
         var x = Math.max(this._displayX, 0);
         var y = Math.max(this._displayY, 0);
         if (y < this._destinationY) {
-            $gameMap.scrollDown(this.scrollDistance());
+            var d = Math.min(this._destinationY - y, this.scrollDistance());
+            $gameMap.scrollDown(d);
         }
         if (x > this._destinationX) {
-            $gameMap.scrollLeft(this.scrollDistance());
+            var d = Math.min(x - this._destinationX, this.scrollDistance());
+            $gameMap.scrollLeft(d);
         }
         if (x < this._destinationX) {
-            $gameMap.scrollRight(this.scrollDistance());
+            var d = Math.min(this._destinationX - x, this.scrollDistance());
+            $gameMap.scrollRight(d);
         }
         if (y > this._destinationY) {
-            $gameMap.scrollUp(this.scrollDistance());
+            var d = Math.min(y - this._destinationY, this.scrollDistance());
+            $gameMap.scrollUp(d);
         }
         if (x === this._destinationX && y === this._destinationY) {
             this.clearDestination();
@@ -2507,7 +2566,7 @@ Game_Character.prototype.searchLimit = function() {
 TacticsSystem.Game_Event_initMembers = Game_Event.prototype.initMembers;
 Game_Event.prototype.initMembers = function() {
     TacticsSystem.Game_Event_initMembers.call(this);
-    this._battler = null;
+    this._battlerId = null;
     this._actor = null;
 };
 
@@ -2523,18 +2582,14 @@ Game_Event.prototype.isEnemy = function() {
     return this._battler && this._battler.isEnemy();
 };
 
-// no oop ! copy ? index ?
+
+// in a perfect world Game_Battler inherits from Game Event ;-)
 Game_Event.prototype.battler = function() {
     return this._battler;
 };
 
 Game_Event.prototype.setActor = function(actor) {
     this._actor = actor;
-};
-
-// no oop ! copy ? index ?
-Game_Event.prototype.actor = function() {
-    return this._actor;
 };
 
 Game_Event.prototype.tparam = function(paramString) {
@@ -2577,22 +2632,6 @@ Game_Event.prototype.updateAppeared = function() {
 
 Game_Event.prototype.name = function() {
     return this.tparam('name') || this.event().name;
-};
-
-Game_Event.prototype.startWithActor = function(actor) {
-    this.setActor(actor);
-    this.start();
-};
-
-TacticsSystem.Game_Event_updateAppeared = Game_Event.prototype.updateAppeared;
-Game_Event.prototype.updateAppeared = function() {
-    if ($gamePartyTs.inBattle() && this._battler) {
-        if (this._battler.isDead()) {
-            this.setTransparent(true);
-        }
-    } else {
-         TacticsSystem.Game_Event_updateAppeared.call(this);
-    }
 };
 
 //-----------------------------------------------------------------------------
@@ -2755,9 +2794,9 @@ Game_Selector.prototype.executeMove = function(x, y, direction) {
 };
 
 Game_Selector.prototype.performTransfer = function(x, y) {
+    $gameMap.performScroll(x, y);
     this._x = this._realX = x;
     this._y = this._realY = y;
-    $gameMap.performScroll(x, y);
     this.updateSelect();
 };
 
@@ -2921,6 +2960,120 @@ Game_Selector.prototype.selectTarget = function(action) {
 };
 
 //-----------------------------------------------------------------------------
+// Game_Interpreter
+//
+// The interpreter for running event commands.
+
+TacticsSystem.Game_Interpreter_updateWaitMode = Game_Interpreter.prototype.updateWaitMode;
+Game_Interpreter.prototype.updateWaitMode = function() {
+    var waiting = false;
+    switch (this._waitMode) {
+    case 'TS.battle':
+        waiting = SceneManager.isCurrentScene(Scene_Tactics) || SceneManager.isSceneChanging();
+        break;
+    case 'TS.selector':
+        waiting = $gameSelector.isBusy();
+        break;
+    default:
+        return TacticsSystem.Game_Interpreter_updateWaitMode.call(this);
+    }
+    if (!waiting) {
+        this._waitMode = '';
+    }
+    return waiting;
+};
+
+TacticsSystem.Game_Interpreter_iterateEnemyIndex = Game_Interpreter.prototype.iterateEnemyIndex;
+Game_Interpreter.prototype.iterateEnemyIndex = function(param, callback) {
+    if ($gamePartyTs.inBattle()) {
+        if (param < 0) {
+            $gameTroopTs.members().forEach(callback);
+        } else {
+            var enemy = $gameTroopTs.members()[param];
+            if (enemy) {
+                callback(enemy);
+            }
+        }
+    } else {
+        TacticsSystem.Game_Interpreter_iterateEnemyIndex.call(this, param, callback);
+    }
+};
+
+// Battle Processing
+TacticsSystem.Game_Interpreter_command301 = Game_Interpreter.prototype.command301;
+Game_Interpreter.prototype.command301 = function() {
+    var res = TacticsSystem.Game_Interpreter_command301.call(this);
+    if (SceneManager.isNextScene(Scene_Battle) && TacticsSystem.isActive) {
+        SceneManager.pop();
+        this.setWaitMode('TS.battle');
+        SceneManager.push(Scene_Tactics);
+    }
+    return res;
+};
+
+// Tactics Battle Processing
+Game_Interpreter.prototype.battleProcessing = function(active) {
+    if (active.toLowerCase() === 'off') {
+        TacticsSystem.isActive = false;
+    } else {
+        TacticsSystem.isActive = true;
+    }
+};
+
+// Tactics Clear All
+Game_Interpreter.prototype.clearAll = function(active) {
+    if (active.toLowerCase() === 'off') {
+        TacticsSystem.clearAll = false;
+    } else {
+        TacticsSystem.clearAll = true;
+    }
+};
+
+// Tactics Process Victory
+Game_Interpreter.prototype.processVictory = function() {
+    TacticsManager.processVictory();
+};
+
+// Tactics Process Defeat
+Game_Interpreter.prototype.processDefeat = function() {
+    TacticsSystem.isDefeated = true;
+    TacticsManager.processDefeat();
+};
+
+// Selector Active
+Game_Interpreter.prototype.selectorActive = function(active) {
+     if (active.toLowerCase() === 'off') {
+        $gameSelector.deactivate();
+    } else {
+        $gameSelector.activate();
+    }
+};
+
+// Selector Transfer
+Game_Interpreter.prototype.selectorTransfer = function(x, y) {
+    $gameSelector.performTransfer(Number(x), Number(y));
+    this.setWaitMode('TacticsSystem.selector');
+};
+
+// Selector Move To
+Game_Interpreter.prototype.selectorMoveTo = function(x, y) {
+    $gameSelector.moveTo(Number(x), Number(y));
+    this.setWaitMode('TacticsSystem.selector');
+};
+
+// Selector Event
+Game_Interpreter.prototype.selectorEvent = function(eventId) {
+    var event = $gameMap.event(Number(eventId));
+    $gameSelector.performTransfer(event.x, event.y);
+    this.setWaitMode('TacticsSystem.selector');
+};
+
+// Unit End Action
+Game_Interpreter.prototype.unitEndAction = function() {
+    TacticsManger.endAction();
+};
+
+//-----------------------------------------------------------------------------
 // Game_UnitTs
 //
 // The superclass of Game_PartyTs and Game_TroopTs.
@@ -2972,7 +3125,7 @@ Game_UnitTs.prototype.isPhase = function() {
 //-----------------------------------------------------------------------------
 // Game_PartyTs
 //
-// The game object class for a party tactic.
+// The game object class for a party tactics.
 
 function Game_PartyTs() {
     this.initialize.apply(this, arguments);
@@ -3076,10 +3229,11 @@ Game_TroopTs.prototype.clear = function() {
     this._enemies = [];
 };
 
-Game_TroopTs.prototype.addEnemy = function(enemy, event) {
+Game_TroopTs.prototype.addEnemy = function(enemyId, event) {
+    var enemy = new Game_Enemy(enemyId);
     var eventId = event.eventId();
-    if (event.tparam('index') > 0) {
-        index = event.tparam('index') - 1;
+    if (event.tparam('troop') > 0) {
+        index = event.tparam('troop') - 1;
         this._enemies.splice(index, 0, enemy);
     } else {
         this._enemies.push(enemy);
@@ -3125,7 +3279,7 @@ TacticsSystem.Scene_Map_launchBattle = Scene_Map.prototype.launchBattle;
 Scene_Map.prototype.launchBattle = function() {
     // launchbattlets two times ! because push scene battle in first
     if (TacticsSystem.isActive) {
-        // abort launchbattlets if scene_battle and ts.isactive
+        // abort launchbattlets if scene_tactics
         if (SceneManager.isNextScene(Scene_Tactics)) {
             this.launchBattleTS();
         }
@@ -3175,7 +3329,8 @@ Scene_Map.prototype.updateEncounterEffectTS = function() {
 
 TacticsSystem.Scene_Map_encounterEffectSpeed = Scene_Map.prototype.encounterEffectSpeed;
 Scene_Map.prototype.encounterEffectSpeed = function() {
-    return SceneManager.isNextScene(Scene_Tactics) ? 180 : TacticsSystem.Scene_Map_encounterEffectSpeed(this);
+    return SceneManager.isNextScene(Scene_Tactics) ? 180 :
+        TacticsSystem.Scene_Map_encounterEffectSpeed(this);
 };
 
 //-----------------------------------------------------------------------------
@@ -3226,6 +3381,7 @@ Scene_Tactics.prototype.createAllWindows = function() {
     this.createMessageWindow();
     this.createInfoWindow();
     this.createMapWindow();
+    this.createStatusWindow();
 };
 
 Scene_Tactics.prototype.createLogWindow = function() {
@@ -3241,27 +3397,27 @@ Scene_Tactics.prototype.createUnitWindow = function() {
 Scene_Tactics.prototype.createActorWindow = function() {
     var sx = 32;
     this._actorWindow = new Window_TacticsStatus();
-    this._actorWindow.x = Graphics.boxWidth / 2 - this._actorWindow.width - sx;
+    this._actorWindow.x = Graphics.boxWidth / 2 + sx;
     this.addWindow(this._actorWindow);
 };
 
 Scene_Tactics.prototype.createEnemyWindow = function() {
     var sx = 32;
     this._enemyWindow = new Window_TacticsStatus();
-    this._enemyWindow.x = Graphics.boxWidth / 2 + sx;
+    this._enemyWindow.x = Graphics.boxWidth / 2 - this._enemyWindow.width - sx;
     this.addWindow(this._enemyWindow);
 };
 
 Scene_Tactics.prototype.createActorCommandWindow = function() {
-    this._tacticsCommand = new Window_TacticsCommand();
-    this._tacticsCommand.setHandler('attack', this.commandAttack.bind(this));
-    this._tacticsCommand.setHandler('skill',  this.commandSkill.bind(this));
-    this._tacticsCommand.setHandler('guard',  this.commandGuard.bind(this));
-    this._tacticsCommand.setHandler('item',   this.commandItem.bind(this));
-    this._tacticsCommand.setHandler('event',  this.commandEvent.bind(this));
-    this._tacticsCommand.setHandler('cancel', this.selectPreviousCommand.bind(this));
-    this._tacticsCommand.setHandler('wait',   this.commandWait.bind(this));
-    this.addWindow(this._tacticsCommand);
+    this._tacticsCommandWindow = new Window_TacticsCommand();
+    this._tacticsCommandWindow.setHandler('attack', this.commandAttack.bind(this));
+    this._tacticsCommandWindow.setHandler('skill',  this.commandSkill.bind(this));
+    this._tacticsCommandWindow.setHandler('guard',  this.commandGuard.bind(this));
+    this._tacticsCommandWindow.setHandler('item',   this.commandItem.bind(this));
+    this._tacticsCommandWindow.setHandler('event',  this.commandEvent.bind(this));
+    this._tacticsCommandWindow.setHandler('cancel', this.selectPreviousCommand.bind(this));
+    this._tacticsCommandWindow.setHandler('wait',   this.commandWait.bind(this));
+    this.addWindow(this._tacticsCommandWindow);
 };
 
 Scene_Tactics.prototype.createHelpWindow = function() {
@@ -3271,9 +3427,9 @@ Scene_Tactics.prototype.createHelpWindow = function() {
 };
 
 Scene_Tactics.prototype.createSkillWindow = function() {
-    var ww = Graphics.boxWidth - this._tacticsCommand.width;
-    var wh = this._tacticsCommand.fittingHeight(4);
-    this._skillWindow = new Window_TacticsSkill(0, this._tacticsCommand.y, ww, wh);
+    var ww = Graphics.boxWidth - this._tacticsCommandWindow.width;
+    var wh = this._tacticsCommandWindow.fittingHeight(4);
+    this._skillWindow = new Window_TacticsSkill(0, this._tacticsCommandWindow.y, ww, wh);
     this._skillWindow.setHelpWindow(this._helpWindow);
     this._skillWindow.setHandler('ok',     this.onSkillOk.bind(this));
     this._skillWindow.setHandler('cancel', this.onSkillCancel.bind(this));
@@ -3281,9 +3437,9 @@ Scene_Tactics.prototype.createSkillWindow = function() {
 };
 
 Scene_Tactics.prototype.createItemWindow = function() {
-    var ww = Graphics.boxWidth - this._tacticsCommand.width;
-    var wh = this._tacticsCommand.fittingHeight(4);
-    this._itemWindow = new Window_TacticsItem(0, this._tacticsCommand.y, ww, wh);
+    var ww = Graphics.boxWidth - this._tacticsCommandWindow.width;
+    var wh = this._tacticsCommandWindow.fittingHeight(4);
+    this._itemWindow = new Window_TacticsItem(0, this._tacticsCommandWindow.y, ww, wh);
     this._itemWindow.setHelpWindow(this._helpWindow);
     this._itemWindow.setHandler('ok',     this.onItemOk.bind(this));
     this._itemWindow.setHandler('cancel', this.onItemCancel.bind(this));
@@ -3300,15 +3456,13 @@ Scene_Tactics.prototype.createMessageWindow = function() {
 
 Scene_Tactics.prototype.createInfoWindow = function() {
     this._infoWindow = new Window_TacticsInfo();
-    this._infoWindow.x = Graphics.boxWidth / 4;
-    this._infoWindow.y = Graphics.boxHeight / 2 - this._infoWindow.height / 2;
+    this._infoWindow.x = Graphics.boxWidth / 2 - this._infoWindow.width / 2;
+    this._infoWindow.y = 0;
     this.addWindow(this._infoWindow);
 };
 
 Scene_Tactics.prototype.createMapWindow = function() {
     this._mapWindow = new Window_TacticsMap(0, 0);
-    this._mapWindow.x = Graphics.boxWidth / 2 - this._mapWindow.width / 2;
-    this._mapWindow.y = Graphics.boxHeight / 2 - this._mapWindow.height / 2;
     this._mapWindow.setHandler('endTurn', this.commandEndTurn.bind(this));
     this._mapWindow.setHandler('equip',   this.commandPersonal.bind(this));
     this._mapWindow.setHandler('status',  this.commandPersonal.bind(this));
@@ -3318,13 +3472,20 @@ Scene_Tactics.prototype.createMapWindow = function() {
     this.addWindow(this._mapWindow);
 };
 
+Scene_Tactics.prototype.createStatusWindow = function() {
+    var wx = this._mapWindow.x + this._mapWindow.width;
+    this._statusWindow = new Window_MenuStatus(wx, 0);
+    this._statusWindow.reserveFaceImages();
+    this._statusWindow.hide();
+    this.addWindow(this._statusWindow);
+};
+
 Scene_Tactics.prototype.commandPersonal = function() {
     this._statusWindow.setFormationMode(false);
     this._statusWindow.selectLast();
     this._statusWindow.activate();
     this._statusWindow.setHandler('ok',     this.onPersonalOk.bind(this));
     this._statusWindow.setHandler('cancel', this.onPersonalCancel.bind(this));
-    this._statusWindow.show();
 };
 
 Scene_Tactics.prototype.commandFormation = function() {
@@ -3344,6 +3505,9 @@ Scene_Tactics.prototype.commandCancelMapWindow = function() {
     $gameSelector.setTransparent(false);
     this._actorWindow.show();
     this._mapWindow.hide();
+    this._statusWindow.hide();
+    this._actorWindow.show();
+    this._enemyWindow.show();
     this._mapWindow.deactivate();
     this.menuCalling = false;
 };
@@ -3359,6 +3523,7 @@ Scene_Tactics.prototype.start = function() {
 };
 
 Scene_Tactics.prototype.loadFaceset = function() {
+    this._statusWindow.refresh();
     this.loadFacesetActor();
     this.loadFacesetEnemy();
 };
@@ -3402,6 +3567,7 @@ Scene_Tactics.prototype.updateCallMenu = function() {
             $gameSelector.setTransparent(true);
             this._actorWindow.hide();
             SceneManager.snapForBackground();
+            SoundManager.playOk();
             this.callMenu();
         }
          if (this.isMenuCalled() && TacticsManager.isExploring()) {
@@ -3413,9 +3579,11 @@ Scene_Tactics.prototype.updateCallMenu = function() {
 };
 
 Scene_Tactics.prototype.callMenu = function() {
-    SoundManager.playOk();
     this.menuCalling = false;
     this._mapWindow.show();
+    this._statusWindow.show();
+    this._actorWindow.hide();
+    this._enemyWindow.hide();
     this._mapWindow.activate();
 };
 
@@ -3428,8 +3596,6 @@ Scene_Tactics.prototype.commandEndTurn = function() {
 Scene_Tactics.prototype.updateDestination = function() {
     if (this.isMapTouchOk()) {
         this.processMapTouch();
-    } else {
-        $gameTemp.clearDestination();
     }
 };
 
@@ -3462,15 +3628,16 @@ Scene_Tactics.prototype.isBusy = function() {
 };
 
 Scene_Tactics.prototype.isAnyInputWindowActive = function() {
-    return (this._tacticsCommand.active ||
+    return (this._tacticsCommandWindow.active ||
             this._skillWindow.active ||
             this._itemWindow.active ||
-            this._mapWindow.active);
+            this._mapWindow.active ||
+            this._statusWindow.active);
 };
 
 Scene_Tactics.prototype.startActorCommandSelection = function() {
     this._actorWindow.show();
-    this._tacticsCommand.setup(TacticsManager.actor());
+    this._tacticsCommandWindow.setup(TacticsManager.actor());
 };
 
 Scene_Tactics.prototype.commandAttack = function() {
@@ -3485,7 +3652,7 @@ Scene_Tactics.prototype.commandAttack = function() {
 Scene_Tactics.prototype.commandSkill = function() {
     this._actorWindow.hide();
     this._skillWindow.setActor(TacticsManager.actor());
-    this._skillWindow.setStypeId(this._tacticsCommand.currentExt());
+    this._skillWindow.setStypeId(this._tacticsCommandWindow.currentExt());
     this._skillWindow.refresh();
     this._skillWindow.show();
     this._skillWindow.activate();
@@ -3493,7 +3660,7 @@ Scene_Tactics.prototype.commandSkill = function() {
 
 Scene_Tactics.prototype.commandGuard = function() {
     TacticsManager.inputtingAction().setGuard();
-    this._tacticsCommand.close();
+    this._tacticsCommandWindow.close();
     TacticsManager.setupAction();
 };
 
@@ -3507,9 +3674,9 @@ Scene_Tactics.prototype.commandItem = function() {
 Scene_Tactics.prototype.commandEvent = function() {
     $gameTemp.setCancel(false);
     var subject = TacticsManager.actor();
-    var eventId = subject.actionsButton()[this._tacticsCommand.index()];
+    var eventId = subject.actionsButton()[this._tacticsCommandWindow.index()];
     var event = $gameMap.event(eventId);
-    event.startWithActor(subject);
+    event.start();
     TacticsManager.turnTowardCharacter(event);
     this.onSelectAction();
 };
@@ -3517,7 +3684,7 @@ Scene_Tactics.prototype.commandEvent = function() {
 Scene_Tactics.prototype.commandWait = function() {
     TacticsManager.inputtingAction().setWait();
     TacticsManager.setupAction();
-    this._tacticsCommand.close();
+    this._tacticsCommandWindow.close();
 };
 
 Scene_Tactics.prototype.onPersonalOk = function() {
@@ -3536,6 +3703,7 @@ Scene_Tactics.prototype.onPersonalOk = function() {
 };
 
 Scene_Tactics.prototype.onPersonalCancel = function() {
+    this._statusWindow.deselect();
     this._mapWindow.activate();
     $gameSelector.setTransparent(false);
 };
@@ -3563,7 +3731,7 @@ Scene_Tactics.prototype.onSkillCancel = function() {
     TacticsManager.processCancel();
     this._actorWindow.show();
     this._skillWindow.hide();
-    this._tacticsCommand.activate();
+    this._tacticsCommandWindow.activate();
 };
 
 Scene_Tactics.prototype.onItemOk = function() {
@@ -3580,17 +3748,17 @@ Scene_Tactics.prototype.onItemCancel = function() {
     TacticsManager.processCancel();
     this._actorWindow.show();
     this._itemWindow.hide();
-    this._tacticsCommand.activate();
+    this._tacticsCommandWindow.activate();
 };
 
 Scene_Tactics.prototype.onSelectAction = function() {
     this._skillWindow.hide();
     this._itemWindow.hide();
-    this._tacticsCommand.close();
+    this._tacticsCommandWindow.close();
 };
 
 Scene_Tactics.prototype.endCommandSelection = function() {
-    this._tacticsCommand.close();
+    this._tacticsCommandWindow.close();
 };
 
 Scene_Tactics.prototype.stop = function() {
@@ -3615,6 +3783,662 @@ Scene_Tactics.prototype.terminate = function() {
 };
 
 //-----------------------------------------------------------------------------
+// Sprite_Selector
+//
+// The sprite for displaying a selector.
+
+function Sprite_Selector() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_Selector.prototype = Object.create(Sprite_Base.prototype);
+Sprite_Selector.prototype.constructor = Sprite_Selector;
+
+Sprite_Selector.prototype.initialize = function() {
+    Sprite_Base.prototype.initialize.call(this);
+    this.loadBitmap();
+};
+
+Sprite_Selector.prototype.loadBitmap = function() {
+    this.bitmap = ImageManager.loadSystem('Selector');
+};
+
+Sprite_Selector.prototype.update = function() {
+    Sprite_Base.prototype.update.call(this);
+    this.updateVisibility();
+    this.x = $gameSelector.screenX();
+    this.y = $gameSelector.screenY();
+};
+
+Sprite_Selector.prototype.updateVisibility = function() {
+    Sprite_Base.prototype.updateVisibility.call(this);
+    this.visible = !$gameSelector.isTransparent();
+};
+
+//-----------------------------------------------------------------------------
+// Sprite_Grid
+//
+// The sprite for displaying a grid.
+
+function Sprite_Grid() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_Grid.prototype = Object.create(Sprite_Base.prototype);
+Sprite_Grid.prototype.constructor = Sprite_Grid;
+
+Sprite_Grid.prototype.initialize = function() {
+    Sprite_Base.prototype.initialize.call(this);
+    this.setFrame(0, 0, Graphics.width, Graphics.height);
+    this.createBitmap();
+    this.z = 1;
+    this.opacity = TacticsSystem.gridOpacity || 60;
+};
+
+Sprite_Grid.prototype.createBitmap = function() {
+    var width = $gameMap.width();
+    var height = $gameMap.height();
+    this.bitmap = new Bitmap(width * 48, height * 48);
+    for (var x = 0; x < width; x++) {
+        this.bitmap.drawLine(48 * x, 0, 48 * x, height * 48);
+    }
+    for (var y = 0; y < height; y++) {
+        this.bitmap.drawLine(0, 48 * y, width * 48, 48 * y);
+    }
+};
+
+Sprite_Grid.prototype.update = function() {
+    Sprite_Base.prototype.update.call(this);
+    var screen = $gameScreen;
+    var scale = screen.zoomScale();
+    this.scale.x = scale;
+    this.scale.y = scale;
+    this.x = Math.round($gameMap.adjustX(0) * 48);
+    this.y = Math.round($gameMap.adjustY(0) * 48);
+    this.x += Math.round(screen.shake());
+};
+
+//-----------------------------------------------------------------------------
+// Spriteset_Tactics
+//
+// The set of sprites on the tactics screen.
+
+function Spriteset_Tactics() {
+    this.initialize.apply(this, arguments);
+}
+
+Spriteset_Tactics.prototype = Object.create(Spriteset_Map.prototype);
+Spriteset_Tactics.prototype.constructor = Spriteset_Tactics;
+
+Spriteset_Tactics.prototype.initialize = function() {
+    Spriteset_Map.prototype.initialize.call(this);
+    this.createSelector();
+    this.createStart();
+    this.createGrid();
+    this._sign = 1;
+};
+
+Spriteset_Tactics.prototype.createLowerLayer = function() {
+    Spriteset_Map.prototype.createLowerLayer.call(this);
+    this.createBaseTiles();
+};
+
+Spriteset_Tactics.prototype.createBaseTiles = function() {
+    this._tilesSprite = new Sprite_Base();
+    this._tilesSprite.z = 1;
+    this._rangeTilesSprite = this.createTiles(TacticsSystem.moveScopeColor);
+    this._tilemap.addChild(this._tilesSprite);
+};
+
+Spriteset_Tactics.prototype.createSelector = function() {
+    this._selectorSprite = new Sprite_Selector();
+    this._selectorSprite.z = 1;
+    this._tilemap.addChild(this._selectorSprite);
+};
+
+Spriteset_Tactics.prototype.createTiles = function(color) {
+    var tilesSprite = new Sprite_Base();
+    var width = $gameMap.width();
+    var height = $gameMap.height();
+    tilesSprite.bitmap = new Bitmap(width * 48, height * 48);
+    tilesSprite.opacity = 120;
+    tilesSprite.color = color;
+    this._tilesSprite.addChild(tilesSprite);
+    return tilesSprite
+};
+
+Spriteset_Tactics.prototype.updateRangeTiles = function() {
+    this._rangeTiles = $gameMap.tiles();
+    var width = $gameMap.width();
+    var height = $gameMap.height();
+    this._rangeTilesSprite.bitmap.clearRect(0, 0, width * 48, height * 48);
+    this._rangeTilesSprite.color = $gameMap.color();
+    this._rangeTiles.forEach(function(tile) {
+        var x = $gameMap.positionTileX(tile) * 48;
+        var y = $gameMap.positionTileY(tile) * 48;
+        var color = this._rangeTilesSprite.color;
+        this._rangeTilesSprite.bitmap.fillRect(x + 2, y + 2, 44, 44, color);
+    }, this);
+};
+
+Spriteset_Tactics.prototype.updateTiles = function() {
+    if (this._tilesSprite.opacity >= 255) {
+        this.sign = -1;
+    }
+    if (this._tilesSprite.opacity <= 160) {
+        this.sign = 1;
+    }
+    if (this._rangeTiles !== $gameMap.tiles()) {
+        this.updateRangeTiles();
+    }
+    this._tilesSprite.opacity = this._tilesSprite.opacity + 3 * this.sign;
+    this._tilesSprite.x = $gameScreen.zoomScale();
+    this._tilesSprite.y = $gameScreen.zoomScale();
+    this._tilesSprite.x = Math.round($gameMap.adjustX(0) * 48);
+    this._tilesSprite.y = Math.round($gameMap.adjustY(0) * 48);
+    this._tilesSprite.x += Math.round($gameScreen.shake());
+};
+
+Spriteset_Tactics.prototype.createCharacters = function() {
+    this._characters = [];
+    this._characterSprites = [];
+    this._actorSprites = [];
+    this._enemySprites = [];
+    $gameMap.events().forEach(function(event) {
+        var sprite = null;
+        if (event.isActor() || event.isEnemy()) {
+            sprite = new Sprite_BattlerTs(event);
+        } else {
+            sprite = new Sprite_Character(event);
+        }
+        this._characters.push(event);
+        this._characterSprites.push(sprite);
+        if (event.isActor()) {
+            this._actorSprites.push(sprite);
+        }
+        if (event.isEnemy()) {
+            this._enemySprites.push(sprite);
+        }
+    }, this);
+    for (var i = 0; i < this._characterSprites.length; i++) {
+        this._tilemap.addChild(this._characterSprites[i]);
+    }
+};
+
+Spriteset_Tactics.prototype.createEnemies = function() {
+    this._enemySprites = [];
+    this._characters.forEach(function(event) {
+        if (sprite.isEnemy()) {
+            this._enemySprites.push(sprite);
+        }
+    }, this);
+};
+
+Spriteset_Tactics.prototype.battlerSprites = function() {
+    return this._enemySprites.concat(this._actorSprites);
+};
+
+Spriteset_Tactics.prototype.createGrid = function() {
+    this._tilemap.addChild(new Sprite_Grid());
+};
+
+Spriteset_Tactics.prototype.update = function() {
+    Spriteset_Map.prototype.update.call(this);
+    this.updateTiles();
+};
+
+Spriteset_Tactics.prototype.isBusy = function() {
+    return this.isAnimationPlaying() || this.isAnyoneMoving();
+};
+
+Spriteset_Tactics.prototype.isAnimationPlaying = function() {
+    for (var i = 0; i < this._characterSprites.length; i++) {
+        if (this._characterSprites[i].isAnimationPlaying()) {
+            return true;
+        }
+    }
+    if (this._startSprite.isPlaying()) {
+        return true;
+    }
+    return false;
+};
+
+Spriteset_Tactics.prototype.isAnyoneMoving = function() {
+    for (var i = 0; i < this._characters.length; i++) {
+        if (this._characters[i].isMoving()) {
+            return true;
+        }
+    }
+    return false;
+};
+
+Spriteset_Tactics.prototype.createStart = function() {
+    this._startSprite = new Sprite_Start();
+    this.addChild(this._startSprite);
+};
+
+Spriteset_Tactics.prototype.isEffecting = function() {
+    return this.battlerSprites().some(function(sprite) {
+        return sprite.isEffecting();
+    });
+};
+
+//-----------------------------------------------------------------------------
+// Sprite_BattlerTs
+//
+// The sprite for displaying a battler.
+
+function Sprite_BattlerTs() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_BattlerTs.prototype = Object.create(Sprite_Character.prototype);
+Sprite_BattlerTs.prototype.constructor = Sprite_BattlerTs;
+
+Sprite_BattlerTs.prototype.initialize = function(character) {
+    Sprite_Character.prototype.initialize.call(this, character);
+    this._damages = [];
+    this._appeared = false;
+    this._shake = 0;  // unused
+    this._effectType = null;
+    this._effectDuration = 0;
+    this._battler = character.battler();
+    this.createStateIconSprite();
+    if (TacticsSystem.showStateIcon) {
+        this.createStateIconSprite();
+    }
+    if (TacticsSystem.showHpGauge) {
+        this.createHpGaugeSprite();
+    }
+    // if the battler's dead and back on the tactical scene.
+    if (!character.battler().isAlive()) {
+        this.opacity = 0;
+    }
+};
+
+Sprite_BattlerTs.prototype.createStateIconSprite = function() {
+    this._stateIconSprite = new Sprite_StateIcon();
+    this._stateIconSprite.setup(this._battler);
+    this._stateIconSprite.y = -5;
+    this._stateIconSprite.x = 15;
+    this._stateIconSprite.z = this.z;
+    this._stateIconSprite.scale.x = 0.6;
+    this._stateIconSprite.scale.y = 0.6;
+    this.addChild(this._stateIconSprite);
+};
+
+Sprite_BattlerTs.prototype.createHpGaugeSprite = function() {
+    this._hpGaugeSprite = new Sprite_HpGauge(this._battler);
+    this._hpGaugeSprite.z = this.z;
+    this.addChild(this._hpGaugeSprite);
+};
+
+Sprite_BattlerTs.prototype.initVisibility = function() {
+    this._appeared = this._battler.isAlive();
+    if (!this._appeared) {
+        this.opacity = 0;
+    }
+};
+
+Sprite_BattlerTs.prototype.isActor = function() {
+    return this._character.isActor();
+};
+
+Sprite_BattlerTs.prototype.isEnemy = function() {
+    return this._character.isEnemy();
+};
+
+Sprite_BattlerTs.prototype.update = function() {
+    Sprite_Character.prototype.update.call(this);
+    this.updateDamagePopup();
+    this.updateColor();
+    this.updateEffect();
+};
+
+Sprite_BattlerTs.prototype.updateDamagePopup = function() {
+    this.setupDamagePopup();
+    if (this._damages.length > 0) {
+        for (var i = 0; i < this._damages.length; i++) {
+            this._damages[i].update();
+        }
+        if (!this._damages[0].isPlaying()) {
+            this.parent.removeChild(this._damages[0]);
+            this._damages.shift();
+        }
+    }
+};
+
+Sprite_BattlerTs.prototype.setupDamagePopup = function() {
+    if (this._battler.isDamagePopupRequested()) {
+        var sprite = new Sprite_Damage();
+        sprite.x = this.x + this.damageOffsetX();
+        sprite.y = this.y + this.damageOffsetY();
+        sprite.z = this.z + 1;
+        sprite.setup(this._battler);
+        this._damages.push(sprite);
+        this.parent.addChild(sprite);
+        this._battler.clearDamagePopup();
+        this._battler.clearResult();
+    }
+};
+
+Sprite_BattlerTs.prototype.damageOffsetX = function() {
+    return 24;
+};
+
+Sprite_BattlerTs.prototype.damageOffsetY = function() {
+    return 24;
+};
+
+Sprite_BattlerTs.prototype.isChangeColor = function() {
+    return this._battler.isActor && this._battler.canAction() && !this._battler.isRestricted();
+};
+
+Sprite_BattlerTs.prototype.updateColor = function() {
+    if (this.isChangeColor()) {
+        this.setColorTone([0, 0, 0, 0]);
+    } else {
+        this.setColorTone([0, 0, 0, 255]);
+    }
+};
+
+Sprite_BattlerTs.prototype.setupEffect = function() {
+    if (this._appeared && this._battler.isEffectRequested()) {
+        this.startEffect(this._battler.effectType());
+        this._battler.clearEffect();
+    }
+    if (!this._appeared && this._battler.isAlive()) {
+        this.startEffect('appear');
+    } else if (this._appeared && this._battler.isHidden()) {
+        this.startEffect('disappear');
+    }
+};
+
+Sprite_BattlerTs.prototype.startEffect = function(effectType) {
+    this._effectType = effectType;
+    switch (this._effectType) {
+    case 'appear':
+        this.startAppear();
+        break;
+    case 'disappear':
+        this.startDisappear();
+        break;
+    case 'whiten':
+        this.startWhiten();
+        break;
+    case 'blink':
+        this.startBlink();
+        break;
+    case 'collapse':
+        this.startCollapse();
+        break;
+    case 'bossCollapse':
+        this.startBossCollapse();
+        break;
+    case 'instantCollapse':
+        this.startInstantCollapse();
+        break;
+    }
+    this.revertToNormal();
+};
+
+Sprite_BattlerTs.prototype.startAppear = function() {
+    this._effectDuration = 16;
+    this._appeared = true;
+};
+
+Sprite_BattlerTs.prototype.startDisappear = function() {
+    this._effectDuration = 32;
+    this._appeared = false;
+};
+
+Sprite_BattlerTs.prototype.startWhiten = function() {
+    this._effectDuration = 16;
+};
+
+Sprite_BattlerTs.prototype.startBlink = function() {
+    this._effectDuration = 20;
+};
+
+Sprite_BattlerTs.prototype.startCollapse = function() {
+    this._effectDuration = 32;
+    this._appeared = false;
+};
+
+Sprite_BattlerTs.prototype.startBossCollapse = function() {
+    this._effectDuration = 60;
+    this._appeared = false;
+};
+
+Sprite_BattlerTs.prototype.startInstantCollapse = function() {
+    this._effectDuration = 16;
+    this._appeared = false;
+};
+
+Sprite_BattlerTs.prototype.updateEffect = function() {
+    this.setupEffect();
+    if (this._effectDuration > 0) {
+        this._effectDuration--;
+        switch (this._effectType) {
+        case 'whiten':
+            this.updateWhiten();
+            break;
+        case 'blink':
+            this.updateBlink();
+            break;
+        case 'appear':
+            this.updateAppear();
+            break;
+        case 'disappear':
+            this.updateDisappear();
+            break;
+        case 'collapse':
+            this.updateCollapse();
+            break;
+        case 'bossCollapse':
+            this.updateBossCollapse();
+            break;
+        case 'instantCollapse':
+            this.updateInstantCollapse();
+            break;
+        }
+        if (this._effectDuration === 0) {
+            this._effectType = null;
+        }
+    }
+};
+
+Sprite_BattlerTs.prototype.isEffecting = function() {
+    return this._effectType !== null;
+};
+
+Sprite_BattlerTs.prototype.revertToNormal = function() {
+    this._shake = 0;
+    this.blendMode = 0;
+    this.opacity = 255;
+    this.setBlendColor([0, 0, 0, 0]);
+};
+
+Sprite_BattlerTs.prototype.updateWhiten = function() {
+    var alpha = 128 - (16 - this._effectDuration) * 10;
+    this.setBlendColor([255, 255, 255, alpha]);
+};
+
+Sprite_BattlerTs.prototype.updateBlink = function() {
+    this.opacity = (this._effectDuration % 10 < 5) ? 255 : 0;
+};
+
+Sprite_BattlerTs.prototype.updateAppear = function() {
+    this.opacity = (16 - this._effectDuration) * 16;
+};
+
+Sprite_BattlerTs.prototype.updateDisappear = function() {
+    this.opacity = 256 - (32 - this._effectDuration) * 10;
+};
+
+Sprite_BattlerTs.prototype.updateCollapse = function() {
+    this.blendMode = Graphics.BLEND_ADD;
+    this.setBlendColor([255, 128, 128, 128]);
+    this.opacity *= this._effectDuration / (this._effectDuration + 1);
+};
+
+Sprite_BattlerTs.prototype.updateBossCollapse = function() {
+    this._shake = this._effectDuration % 2 * 4 - 2;
+    this.blendMode = Graphics.BLEND_ADD;
+    this.opacity *= this._effectDuration / (this._effectDuration + 1);
+    this.setBlendColor([255, 255, 255, 255 - this.opacity]);
+    if (this._effectDuration % 20 === 19) {
+        SoundManager.playBossCollapse2();
+    }
+};
+
+Sprite_BattlerTs.prototype.updateInstantCollapse = function() {
+    this.opacity = 0;
+};
+
+Sprite_BattlerTs.prototype.isEffecting = function() {
+    return this._effectType !== null;
+};
+
+Sprite_BattlerTs.prototype.updateOther = function() {
+    if (this._battler.isAlive()) {
+        Sprite_Character.prototype.updateOther.call(this);
+    }
+};
+
+//-----------------------------------------------------------------------------
+// Sprite_HpGauge
+//
+// The sprite for displaying the hp gauge.
+
+function Sprite_HpGauge() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_HpGauge.prototype = Object.create(Sprite_Base.prototype);
+Sprite_HpGauge.prototype.constructor = Sprite_HpGauge;
+
+Sprite_HpGauge.prototype.initialize = function(battler) {
+    Sprite_Base.prototype.initialize.call(this);
+    this.bitmap = new Bitmap(40, 4);
+    this.windowskin = ImageManager.loadSystem('Window');
+    this.anchor.x = 0.5;
+    this.anchor.y = 0;
+    this._battler = battler;
+};
+
+Sprite_HpGauge.prototype.gaugeBackColor = function() {
+    return this.textColor(19);
+};
+
+Sprite_HpGauge.prototype.hpGaugeColor1 = function() {
+    return this.textColor(20);
+};
+
+Sprite_HpGauge.prototype.hpGaugeColor2 = function() {
+    return this.textColor(21);
+};
+
+Sprite_HpGauge.prototype.textColor = function(n) {
+    var px = 96 + (n % 8) * 12 + 6;
+    var py = 144 + Math.floor (n / 8) * 12 + 6;
+    return this.windowskin.getPixel(px, py);
+};
+
+Sprite_HpGauge.prototype.update = function(battler) {
+    Sprite_Base.prototype.update.call(this);
+    this.bitmap.clear();
+    if (this._battler.isAlive()) {
+        this.drawBattlerHP();
+    }
+};
+
+Sprite_HpGauge.prototype.drawBattlerHP = function() {
+    var width = 40;
+    var color1 = this.hpGaugeColor1();
+    var color2 = this.hpGaugeColor2();
+    this.drawGauge(0, 0, width, this._battler.hpRate(), color1, color2)
+};
+
+Sprite_HpGauge.prototype.drawGauge = function(x, y, width, rate, color1, color2) {
+    var fillW = Math.floor(width * rate);
+    this.bitmap.fillRect(x, y, width, 4, this.gaugeBackColor());
+    this.bitmap.gradientFillRect(x, y, fillW, 4, color1, color2);
+};
+
+//-----------------------------------------------------------------------------
+// Sprite_Start
+//
+// The sprite for displaying the start message.
+
+function Sprite_Start() {
+    this.initialize.apply(this, arguments);
+};
+
+Sprite_Start.prototype = Object.create(Sprite_Base.prototype);
+Sprite_Start.prototype.constructor = Sprite_Start;
+
+Sprite_Start.prototype.initialize = function() {
+    Sprite_Base.prototype.initialize.call(this);
+    this.bitmap = new Bitmap(Graphics.width, Graphics.height);
+    this._delay = 0;
+    this._maxDuration = TacticsSystem.durationStartSprite;
+    this.z = 8;
+    this.opacity = 0;
+};
+
+Sprite_Start.prototype.update = function(battler) {
+    Sprite_Base.prototype.update.call(this);
+    this.updateMain();
+    this.updatePosition();
+    this.updateOpacity();
+};
+
+Sprite_Start.prototype.isPlaying = function() {
+    return $gameScreen.startDuration() > 0;
+};
+
+Sprite_Start.prototype.updateMain = function() {
+    if (this.isPlaying()) {
+        this.drawStart();
+        this.updatePosition();
+    } else {
+        this.hide();
+    }
+};
+
+Sprite_Start.prototype.drawStart = function() {
+    var x = 20;
+    var y = Graphics.height / 2;
+    var maxWidth = Graphics.width - x * 2;
+    this.bitmap.clear();
+    this.bitmap.outlineColor = 'black';
+    this.bitmap.outlineWidth = 8;
+    this.bitmap.fontSize = 86;
+    var startTerm = TacticsSystem.battleStartTerm;
+    this.bitmap.drawText(startTerm, x, y, maxWidth, 48, 'center');
+    this.bitmap.outlineWidth = 4;
+    this.bitmap.fontSize = 28;
+    this.opacity = 255;
+    this.show();
+};
+
+Sprite_Start.prototype.updatePosition = function() {
+    this.x = Graphics.width / 2 - this.bitmap.width / 2;
+    this.y = Graphics.height / 2 - this.bitmap.height / 2 - 120;
+};
+
+Sprite_Start.prototype.updateOpacity = function() {
+    var d = $gameScreen.startDuration();
+    if (d < 30) {
+        this.opacity = 255 * d / 30;
+    }
+    if (d > this._maxDuration - 60) {
+        this.opacity = 255 * (this._maxDuration - d) / 60;
+    }
+};
+
+//-----------------------------------------------------------------------------
 // Window_TacticsCommand
 //
 // The window for selecting an actor's action on the tactics screen.
@@ -3627,9 +4451,8 @@ Window_TacticsCommand.prototype = Object.create(Window_ActorCommand.prototype);
 Window_TacticsCommand.prototype.constructor = Window_TacticsCommand;
 
 Window_TacticsCommand.prototype.initialize = function() {
-    var x = Graphics.boxWidth/2  + 816/2 - this.windowWidth();
     var y = Graphics.boxHeight - this.windowHeight();
-    Window_Command.prototype.initialize.call(this, x, y);
+    Window_Command.prototype.initialize.call(this, 0, y);
     this.openness = 0;
     this.deactivate();
     this._actor = null;
@@ -3672,7 +4495,6 @@ Window_TacticsCommand.prototype.addActionCommand = function() {
 Window_TacticsCommand.prototype.addWaitCommand = function() {
     this.addCommand(TacticsSystem.wait, 'wait', true);
 };
-
 
 //-----------------------------------------------------------------------------
 // Window_TacticsStatus
@@ -3851,7 +4673,7 @@ Window_TacticsInfo.prototype.initialize = function() {
 };
 
 Window_TacticsInfo.prototype.windowWidth = function() {
-    return 816/2 - 64;
+    return 816/2 - 100;
 };
 
 Window_TacticsInfo.prototype.windowHeight = function() {
@@ -3859,7 +4681,7 @@ Window_TacticsInfo.prototype.windowHeight = function() {
 };
 
 Window_TacticsInfo.prototype.numVisibleRows = function() {
-    return 15;
+    return 3;
 };
 
 Window_TacticsInfo.prototype.open = function(battlerTS) {
@@ -3873,46 +4695,14 @@ Window_TacticsInfo.prototype.refresh = function() {
     if (this._actor) {
         var lineHeight = this.lineHeight();
         this.drawBlock1(lineHeight * 0);
-        this.drawHorzLine(lineHeight * 4);
-        this.drawBlock2(lineHeight * 5);
-        this.drawHorzLine(lineHeight * 11);
-        this.drawBlock3(lineHeight * 12);
     }
 };
 
 Window_TacticsInfo.prototype.drawBlock1 = function(y) {
-     if (this._actor.isActor()) {
-        this.drawActorFace(this._actor, 8, y);
-    } else {
-        this.drawEnemyImage(this._actor, 8, y + 48);
-    }
-    this.drawBasicInfo(120, y);
-    //this.drawExpInfo(456, y);
-};
-
-Window_TacticsInfo.prototype.drawBasicInfo = function(x, y) {
     var lineHeight = this.lineHeight();
-    this.drawActorName(this._actor, 12, y);
-    if (this._actor.isActor()) {
-        this.drawActorLevel(this._actor, x, y + lineHeight * 0);
-    }
-    this.drawActorIcons(this._actor, x, y + lineHeight * 1);
-    this.drawActorHp(this._actor, x, y + lineHeight * 2);
-    this.drawActorMp(this._actor, x, y + lineHeight * 3);
-};
-
-Window_TacticsInfo.prototype.drawBlock2 = function(y) {
-    this.drawParameters(48, y);
-    if (this._actor.isActor()) {
-       // this.drawEquipments(432, y);
-    }
-};
-
-Window_TacticsInfo.prototype.drawBlock3 = function(y) {
-    var lineHeight = this.lineHeight();
-    this.drawDamage(this._actor, 48, y + lineHeight * 0);
-    this.drawHit(this._actor, 48, y + lineHeight * 1);
-    this.drawCri(this._actor, 48, y + lineHeight * 2);
+    this.drawDamage(this._actor, 16, y + lineHeight * 0);
+    this.drawHit(this._actor, 16, y + lineHeight * 1);
+    this.drawCri(this._actor, 16, y + lineHeight * 2);
 };
 
 Window_TacticsInfo.prototype.drawDamage = function(actor, x, y) {
@@ -3921,7 +4711,7 @@ Window_TacticsInfo.prototype.drawDamage = function(actor, x, y) {
     this.drawDamageType(actor, x, y, width);
     var minHit = Math.abs(action.testDamageMinMaxValue(actor, false));
     var maxHit = Math.abs(action.testDamageMinMaxValue(actor, true));
-    this.drawText(minHit + '-' + maxHit, x + 100, y, 120, 'right');
+    this.drawText(minHit + '-' + maxHit, x + 120, y, 120, 'right');
 };
 
 Window_TacticsInfo.prototype.drawDamageType = function(actor, x, y) {
@@ -3943,7 +4733,7 @@ Window_TacticsInfo.prototype.drawHit = function(actor, x, y) {
     this.resetTextColor();
     var action = TacticsManager.inputtingAction();
     var hit = action.itemHit(actor) * 100 + '%';
-    this.drawText(hit, x + 160, y, 60, 'right');
+    this.drawText(hit, x + 180, y, 60, 'right');
 };
 
 Window_TacticsInfo.prototype.drawCri = function(actor, x, y) {
@@ -3952,7 +4742,7 @@ Window_TacticsInfo.prototype.drawCri = function(actor, x, y) {
     this.resetTextColor();
     var action = TacticsManager.inputtingAction();
     var crit = action.itemCri(actor) * 100 + '%';
-    this.drawText(crit, x + 160, y, 60, 'right');
+    this.drawText(crit, x + 180, y, 60, 'right');
 };
 
 //-----------------------------------------------------------------------------
@@ -4013,706 +4803,6 @@ Window_TacticsMap.prototype.selectLast = function() {
 };
 
 //-----------------------------------------------------------------------------
-// Sprite_SelectorTS
-//
-// The sprite for displaying a selector.
-
-function Sprite_SelectorTS() {
-    this.initialize.apply(this, arguments);
-};
-
-Sprite_SelectorTS.prototype = Object.create(Sprite_Base.prototype);
-Sprite_SelectorTS.prototype.constructor = Sprite_SelectorTS;
-
-Sprite_SelectorTS.prototype.initialize = function() {
-    Sprite_Base.prototype.initialize.call(this);
-    this.loadBitmap();
-};
-
-Sprite_SelectorTS.prototype.loadBitmap = function() {
-    this.bitmap = ImageManager.loadSystem('Selector');
-};
-
-Sprite_SelectorTS.prototype.update = function() {
-    Sprite_Base.prototype.update.call(this);
-    this.updateVisibility();
-    this.x = $gameSelector.screenX();
-    this.y = $gameSelector.screenY();
-};
-
-Sprite_SelectorTS.prototype.updateVisibility = function() {
-    Sprite_Base.prototype.updateVisibility.call(this);
-    this.visible = !$gameSelector.isTransparent();
-};
-
-//-----------------------------------------------------------------------------
-// Sprite_GridTS
-//
-// The sprite for displaying a grid.
-
-// move to spriteset
-function Sprite_GridTS() {
-    this.initialize.apply(this, arguments);
-};
-
-Sprite_GridTS.prototype = Object.create(Sprite_Base.prototype);
-Sprite_GridTS.prototype.constructor = Sprite_GridTS;
-
-Sprite_GridTS.prototype.initialize = function() {
-    Sprite_Base.prototype.initialize.call(this);
-    this.setFrame(0, 0, Graphics.width, Graphics.height);
-    this.createBitmap();
-    this.z = 1;
-    this.opacity = TacticsSystem.gridOpacity || 60;
-};
-
-Sprite_GridTS.prototype.createBitmap = function() {
-    var width = $gameMap.width();
-    var height = $gameMap.height();
-    this.bitmap = new Bitmap(width * 48, height * 48);
-    for (var x = 0; x < width; x++) {
-        this.bitmap.drawLine(48 * x, 0, 48 * x, height * 48);
-    }
-    for (var y = 0; y < height; y++) {
-        this.bitmap.drawLine(0, 48 * y, width * 48, 48 * y);
-    }
-};
-
-Sprite_GridTS.prototype.update = function() {
-    Sprite_Base.prototype.update.call(this);
-    var screen = $gameScreen;
-    var scale = screen.zoomScale();
-    this.scale.x = scale;
-    this.scale.y = scale;
-    this.x = Math.round($gameMap.adjustX(0) * 48);
-    this.y = Math.round($gameMap.adjustY(0) * 48);
-    this.x += Math.round(screen.shake());
-};
-
-//-----------------------------------------------------------------------------
-// Spriteset_Tactics
-//
-// The set of sprites on the tactics screen.
-
-function Spriteset_Tactics() {
-    this.initialize.apply(this, arguments);
-}
-
-Spriteset_Tactics.prototype = Object.create(Spriteset_Map.prototype);
-Spriteset_Tactics.prototype.constructor = Spriteset_Tactics;
-
-Spriteset_Tactics.prototype.initialize = function() {
-    Spriteset_Map.prototype.initialize.call(this);
-    this.createSelector();
-    this.createActors();
-    this.createEnemies();
-    this.createStart();
-    this.createGrid();
-};
-
-Spriteset_Tactics.prototype.createLowerLayer = function() {
-    Spriteset_Map.prototype.createLowerLayer.call(this);
-    this.createBaseTiles();
-};
-
-Spriteset_Tactics.prototype.createBaseTiles = function() {
-    this._tilesSprite = new Sprite_Base();
-    this._tilesSprite.z = 1;
-    this._rangeTilesSprite = this.createTiles(TacticsSystem.moveScopeColor);
-    this._tilemap.addChild(this._tilesSprite);
-};
-
-Spriteset_Tactics.prototype.createSelector = function() {
-    this._selectorSprite = new Sprite_SelectorTS();
-    this._selectorSprite.z = 1;
-    this._tilemap.addChild(this._selectorSprite);
-};
-
-Spriteset_Tactics.prototype.createTiles = function(color) {
-    var tilesSprite = new Sprite_Base();
-    var width = $gameMap.width();
-    var height = $gameMap.height();
-    tilesSprite.bitmap = new Bitmap(width * 48, height * 48);
-    tilesSprite.opacity = 120;
-    tilesSprite.color = color;
-    this._tilesSprite.addChild(tilesSprite);
-    return tilesSprite
-};
-
-Spriteset_Tactics.prototype.updateRangeTiles = function() {
-    this._rangeTiles = $gameMap.tiles();
-    var width = $gameMap.width();
-    var height = $gameMap.height();
-    this._rangeTilesSprite.bitmap.clearRect(0, 0, width * 48, height * 48);
-    this._rangeTilesSprite.color = $gameMap.color();
-    this._rangeTiles.forEach(function(tile) {
-        var x = $gameMap.positionTileX(tile) * 48;
-        var y = $gameMap.positionTileY(tile) * 48;
-        var color = this._rangeTilesSprite.color;
-        this._rangeTilesSprite.bitmap.fillRect(x + 2, y + 2, 44, 44, color);
-    }, this);
-};
-
-Spriteset_Tactics.prototype.updateTiles = function() {
-    if (this._rangeTiles !== $gameMap.tiles()) {
-        this.updateRangeTiles();
-    }
-    this._tilesSprite.x = $gameScreen.zoomScale();
-    this._tilesSprite.y = $gameScreen.zoomScale();
-    this._tilesSprite.x = Math.round($gameMap.adjustX(0) * 48);
-    this._tilesSprite.y = Math.round($gameMap.adjustY(0) * 48);
-    this._tilesSprite.x += Math.round($gameScreen.shake());
-};
-
-Spriteset_Tactics.prototype.createCharacters = function() {
-    this._characterSprites = [];
-    $gameMap.events().forEach(function(event) {
-        var sprite = null;
-        if (event.isActor() || event.isEnemy()) {
-            sprite = new Sprite_BattlerTS(event);
-        } else {
-            sprite = new Sprite_Character(event);
-        }
-        this._characterSprites.push(sprite);
-    }, this);
-    for (var i = 0; i < this._characterSprites.length; i++) {
-        this._tilemap.addChild(this._characterSprites[i]);
-    }
-};
-
-Spriteset_Tactics.prototype.createActors = function() {
-    this._actorSprites = [];
-    this._characterSprites.forEach(function(sprite) {
-        var event = sprite.character();
-        if (event.isActor()) {
-            this._actorSprites.push(sprite);
-        }
-    }, this);
-};
-
-Spriteset_Tactics.prototype.createEnemies = function() {
-    this._enemySprites = [];
-    this._characterSprites.forEach(function(sprite) {
-        var event = sprite.character();
-        if (event.isEnemy()) {
-            this._enemySprites.push(sprite);
-        }
-    }, this);
-};
-
-Spriteset_Tactics.prototype.battlerSprites = function() {
-    return this._enemySprites.concat(this._actorSprites);
-};
-
-Spriteset_Tactics.prototype.createGrid = function() {
-    this._tilemap.addChild(new Sprite_GridTS());
-};
-
-Spriteset_Tactics.prototype.update = function() {
-    Spriteset_Map.prototype.update.call(this);
-    this.updateTiles();
-};
-
-Spriteset_Tactics.prototype.isBusy = function() {
-    return this.isAnimationPlaying() || this.isAnyoneMoving();
-};
-
-Spriteset_Tactics.prototype.isAnimationPlaying = function() {
-    for (var i = 0; i < this._characterSprites.length; i++) {
-        if (this._characterSprites[i].isAnimationPlaying()) {
-            return true;
-        }
-    }
-    if (this._startSprite.isPlaying()) {
-        return true;
-    }
-    return false;
-};
-
-Spriteset_Tactics.prototype.isAnyoneMoving = function() {
-    var battlerSprites = this.battlerSprites();
-    for (var i = 0; i < battlerSprites.length; i++) {
-        var event = battlerSprites[i].character();
-        if (event.isMoving()) {
-            return true;
-        }
-    }
-    return false;
-};
-
-Spriteset_Tactics.prototype.createStart = function() {
-    this._startSprite = new Sprite_Start();
-    this.addChild(this._startSprite);
-};
-
-Spriteset_Tactics.prototype.isEffecting = function() {
-    return this.battlerSprites().some(function(sprite) {
-        return sprite.isEffecting();
-    });
-};
-
-//-----------------------------------------------------------------------------
-// Sprite_BattlerTS
-//
-// The sprite for displaying a battler.
-
-function Sprite_BattlerTS() {
-    this.initialize.apply(this, arguments);
-};
-
-Sprite_BattlerTS.prototype = Object.create(Sprite_Character.prototype);
-Sprite_BattlerTS.prototype.constructor = Sprite_BattlerTS;
-
-Sprite_BattlerTS.prototype.initialize = function(character) {
-    Sprite_Character.prototype.initialize.call(this, character);
-    this._damages = [];
-    this._appeared = false;
-    this._shake = 0;  // unused
-    this._effectType = null;
-    this._effectDuration = 0;
-    this.createStateIconSprite();
-    this.setBattler(character.battler());
-    if (TacticsSystem.showStateIcon) {
-        this.createStateIconSprite();
-    }
-    if (TacticsSystem.showHpGauge) {
-        this.createHpGaugeSprite();
-    }
-};
-
-Sprite_BattlerTS.prototype.createStateIconSprite = function() {
-    this._stateIconSprite = new Sprite_StateIcon();
-    this._stateIconSprite.setup(this._battler);
-    this._stateIconSprite.y = -5;
-    this._stateIconSprite.x = 15;
-    this._stateIconSprite.z = this.z;
-    this._stateIconSprite.scale.x = 0.6;
-    this._stateIconSprite.scale.y = 0.6;
-    this.addChild(this._stateIconSprite);
-};
-
-Sprite_BattlerTS.prototype.createHpGaugeSprite = function() {
-    this._hpGaugeSprite = new Sprite_HpGaugeTS(this._battler);
-    this._hpGaugeSprite.z = this.z;
-    this.addChild(this._hpGaugeSprite);
-};
-
-Sprite_BattlerTS.prototype.initVisibility = function() {
-    this._appeared = this._battler.isAlive();
-    if (!this._appeared) {
-        this.opacity = 0;
-    }
-};
-
-Sprite_BattlerTS.prototype.setBattler = function(battler) {
-    this._battler = battler;
-};
-
-Sprite_BattlerTS.prototype.update = function() {
-    Sprite_Character.prototype.update.call(this);
-    this.updateDamagePopup();
-    this.updateColor();
-    this.updateEffect();
-};
-
-Sprite_BattlerTS.prototype.updateDamagePopup = function() {
-    this.setupDamagePopup();
-    if (this._damages.length > 0) {
-        for (var i = 0; i < this._damages.length; i++) {
-            this._damages[i].update();
-        }
-        if (!this._damages[0].isPlaying()) {
-            this.parent.removeChild(this._damages[0]);
-            this._damages.shift();
-        }
-    }
-};
-
-Sprite_BattlerTS.prototype.setupDamagePopup = function() {
-    if (this._battler.isDamagePopupRequested()) {
-        var sprite = new Sprite_Damage();
-        sprite.x = this.x + this.damageOffsetX();
-        sprite.y = this.y + this.damageOffsetY();
-        sprite.z = this.z + 1;
-        sprite.setup(this._battler);
-        this._damages.push(sprite);
-        this.parent.addChild(sprite);
-        this._battler.clearDamagePopup();
-        this._battler.clearResult();
-    }
-};
-
-Sprite_BattlerTS.prototype.damageOffsetX = function() {
-    return 24;
-};
-
-Sprite_BattlerTS.prototype.damageOffsetY = function() {
-    return 24;
-};
-
-Sprite_BattlerTS.prototype.isChangeColor = function() {
-    return this._battler.isActor && this._battler.canAction() && !this._battler.isRestricted();
-};
-
-Sprite_BattlerTS.prototype.updateColor = function() {
-    if (this.isChangeColor()) {
-        this.setColorTone([0, 0, 0, 0]);
-    } else {
-        this.setColorTone([0, 0, 0, 255]);
-    }
-};
-
-Sprite_BattlerTS.prototype.setupEffect = function() {
-    if (this._appeared && this._battler.isEffectRequested()) {
-        this.startEffect(this._battler.effectType());
-        this._battler.clearEffect();
-    }
-    if (!this._appeared && this._battler.isAlive()) {
-        this.startEffect('appear');
-    } else if (this._appeared && this._battler.isHidden()) {
-        this.startEffect('disappear');
-    }
-};
-
-Sprite_BattlerTS.prototype.startEffect = function(effectType) {
-    this._effectType = effectType;
-    switch (this._effectType) {
-    case 'appear':
-        this.startAppear();
-        break;
-    case 'disappear':
-        this.startDisappear();
-        break;
-    case 'whiten':
-        this.startWhiten();
-        break;
-    case 'blink':
-        this.startBlink();
-        break;
-    case 'collapse':
-        this.startCollapse();
-        break;
-    case 'bossCollapse':
-        this.startBossCollapse();
-        break;
-    case 'instantCollapse':
-        this.startInstantCollapse();
-        break;
-    }
-    this.revertToNormal();
-};
-
-Sprite_BattlerTS.prototype.startAppear = function() {
-    this._effectDuration = 16;
-    this._appeared = true;
-};
-
-Sprite_BattlerTS.prototype.startDisappear = function() {
-    this._effectDuration = 32;
-    this._appeared = false;
-};
-
-Sprite_BattlerTS.prototype.startWhiten = function() {
-    this._effectDuration = 16;
-};
-
-Sprite_BattlerTS.prototype.startBlink = function() {
-    this._effectDuration = 20;
-};
-
-Sprite_BattlerTS.prototype.startCollapse = function() {
-    this._effectDuration = 32;
-    this._appeared = false;
-};
-
-Sprite_BattlerTS.prototype.startBossCollapse = function() {
-    this._effectDuration = 60;
-    this._appeared = false;
-};
-
-Sprite_BattlerTS.prototype.startInstantCollapse = function() {
-    this._effectDuration = 16;
-    this._appeared = false;
-};
-
-Sprite_BattlerTS.prototype.updateEffect = function() {
-    this.setupEffect();
-    if (this._effectDuration > 0) {
-        this._effectDuration--;
-        switch (this._effectType) {
-        case 'whiten':
-            this.updateWhiten();
-            break;
-        case 'blink':
-            this.updateBlink();
-            break;
-        case 'appear':
-            this.updateAppear();
-            break;
-        case 'disappear':
-            this.updateDisappear();
-            break;
-        case 'collapse':
-            this.updateCollapse();
-            break;
-        case 'bossCollapse':
-            this.updateBossCollapse();
-            break;
-        case 'instantCollapse':
-            this.updateInstantCollapse();
-            break;
-        }
-        if (this._effectDuration === 0) {
-            this._effectType = null;
-        }
-    }
-};
-
-Sprite_BattlerTS.prototype.isEffecting = function() {
-    return this._effectType !== null;
-};
-
-Sprite_BattlerTS.prototype.revertToNormal = function() {
-    this._shake = 0;
-    this.blendMode = 0;
-    this.opacity = 255;
-    this.setBlendColor([0, 0, 0, 0]);
-};
-
-Sprite_BattlerTS.prototype.updateWhiten = function() {
-    var alpha = 128 - (16 - this._effectDuration) * 10;
-    this.setBlendColor([255, 255, 255, alpha]);
-};
-
-Sprite_BattlerTS.prototype.updateBlink = function() {
-    this.opacity = (this._effectDuration % 10 < 5) ? 255 : 0;
-};
-
-Sprite_BattlerTS.prototype.updateAppear = function() {
-    this.opacity = (16 - this._effectDuration) * 16;
-};
-
-Sprite_BattlerTS.prototype.updateDisappear = function() {
-    this.opacity = 256 - (32 - this._effectDuration) * 10;
-};
-
-Sprite_BattlerTS.prototype.updateCollapse = function() {
-    this.blendMode = Graphics.BLEND_ADD;
-    this.setBlendColor([255, 128, 128, 128]);
-    this.opacity *= this._effectDuration / (this._effectDuration + 1);
-};
-
-Sprite_BattlerTS.prototype.updateBossCollapse = function() {
-    this._shake = this._effectDuration % 2 * 4 - 2;
-    this.blendMode = Graphics.BLEND_ADD;
-    this.opacity *= this._effectDuration / (this._effectDuration + 1);
-    this.setBlendColor([255, 255, 255, 255 - this.opacity]);
-    if (this._effectDuration % 20 === 19) {
-        SoundManager.playBossCollapse2();
-    }
-};
-
-Sprite_BattlerTS.prototype.updateInstantCollapse = function() {
-    this.opacity = 0;
-};
-
-Sprite_BattlerTS.prototype.isEffecting = function() {
-    return this._effectType !== null;
-};
-
-Sprite_BattlerTS.prototype.updateOther = function() {
-    if (this._battler.isAlive()) {
-        Sprite_Character.prototype.updateOther.call(this);
-    }
-};
-
-//-----------------------------------------------------------------------------
-// Sprite_HpGaugeTS
-//
-// The sprite for displaying the hp gauge.
-
-function Sprite_HpGaugeTS() {
-    this.initialize.apply(this, arguments);
-};
-
-Sprite_HpGaugeTS.prototype = Object.create(Sprite_Base.prototype);
-Sprite_HpGaugeTS.prototype.constructor = Sprite_HpGaugeTS;
-
-Sprite_HpGaugeTS.prototype.initialize = function(battler) {
-    Sprite_Base.prototype.initialize.call(this);
-    this.bitmap = new Bitmap(40, 4);
-    this.windowskin = ImageManager.loadSystem('Window');
-    this.anchor.x = 0.5;
-    this.anchor.y = 0;
-    this._battler = battler;
-};
-
-Sprite_HpGaugeTS.prototype.gaugeBackColor = function() {
-    return this.textColor(19);
-};
-
-Sprite_HpGaugeTS.prototype.hpGaugeColor1 = function() {
-    return this.textColor(20);
-};
-
-Sprite_HpGaugeTS.prototype.hpGaugeColor2 = function() {
-    return this.textColor(21);
-};
-
-Sprite_HpGaugeTS.prototype.textColor = function(n) {
-    var px = 96 + (n % 8) * 12 + 6;
-    var py = 144 + Math.floor (n / 8) * 12 + 6;
-    return this.windowskin.getPixel(px, py);
-};
-
-Sprite_HpGaugeTS.prototype.update = function(battler) {
-    Sprite_Base.prototype.update.call(this);
-    this.bitmap.clear();
-    if (this._battler.isAlive()) {
-        this.drawBattlerHP();
-    }
-};
-
-Sprite_HpGaugeTS.prototype.drawBattlerHP = function() {
-    var width = 40;
-    var color1 = this.hpGaugeColor1();
-    var color2 = this.hpGaugeColor2();
-    this.drawGauge(0, 0, width, this._battler.hpRate(), color1, color2)
-};
-
-Sprite_HpGaugeTS.prototype.drawGauge = function(x, y, width, rate, color1, color2) {
-    var fillW = Math.floor(width * rate);
-    this.bitmap.fillRect(x, y, width, 4, this.gaugeBackColor());
-    this.bitmap.gradientFillRect(x, y, fillW, 4, color1, color2);
-};
-
-//-----------------------------------------------------------------------------
-// Sprite_Start
-//
-// The sprite for displaying the start message.
-
-function Sprite_Start() {
-    this.initialize.apply(this, arguments);
-};
-
-Sprite_Start.prototype = Object.create(Sprite_Base.prototype);
-Sprite_Start.prototype.constructor = Sprite_Start;
-
-Sprite_Start.prototype.initialize = function() {
-    Sprite_Base.prototype.initialize.call(this);
-    this.bitmap = new Bitmap(Graphics.width, Graphics.height);
-    this._delay = 0;
-    this._maxDuration = TacticsSystem.durationStartSprite;
-    this.z = 8;
-    this.opacity = 0;
-};
-
-Sprite_Start.prototype.update = function(battler) {
-    Sprite_Base.prototype.update.call(this);
-    this.updateMain();
-    this.updatePosition();
-    this.updateOpacity();
-};
-
-Sprite_Start.prototype.isPlaying = function() {
-    return $gameScreen.startDuration() > 0;
-};
-
-Sprite_Start.prototype.updateMain = function() {
-    if (this.isPlaying()) {
-        this.drawStart();
-        this.updatePosition();
-    } else {
-        this.hide();
-    }
-};
-
-Sprite_Start.prototype.drawStart = function() {
-    var x = 20;
-    var y = Graphics.height / 2;
-    var maxWidth = Graphics.width - x * 2;
-    this.bitmap.clear();
-    this.bitmap.outlineColor = 'black';
-    this.bitmap.outlineWidth = 8;
-    this.bitmap.fontSize = 86;
-    var startTerm = TacticsSystem.battleStartTerm;
-    this.bitmap.drawText(startTerm, x, y, maxWidth, 48, 'center');
-    this.bitmap.outlineWidth = 4;
-    this.bitmap.fontSize = 28;
-    this.opacity = 255;
-    this.show();
-};
-
-Sprite_Start.prototype.updatePosition = function() {
-    this.x = Graphics.width / 2 - this.bitmap.width / 2;
-    this.y = Graphics.height / 2 - this.bitmap.height / 2 - 120;
-};
-
-Sprite_Start.prototype.updateOpacity = function() {
-    var d = $gameScreen.startDuration();
-    if (d < 30) {
-        this.opacity = 255 * d / 30;
-    }
-    if (d > this._maxDuration - 60) {
-        this.opacity = 255 * (this._maxDuration - d) / 60;
-    }
-};
-
-//-----------------------------------------------------------------------------
-// Game_Interpreter
-//
-// The interpreter for running event commands.
-
-TacticsSystem.Game_Interpreter_updateWaitMode = Game_Interpreter.prototype.updateWaitMode;
-Game_Interpreter.prototype.updateWaitMode = function() {
-    var waiting = false;
-    switch (this._waitMode) {
-    case 'TS.battle':
-        waiting = SceneManager.isCurrentScene(Scene_Tactics) || SceneManager.isSceneChanging();
-        break;
-    case 'TS.selector':
-        waiting = $gameSelector.isBusy();
-        break;
-    default:
-        return TacticsSystem.Game_Interpreter_updateWaitMode.call(this);
-    }
-    if (!waiting) {
-        this._waitMode = '';
-    }
-    return waiting;
-};
-
-// Battle Processing
-TacticsSystem.Game_Interpreter_command301 = Game_Interpreter.prototype.command301;
-Game_Interpreter.prototype.command301 = function() {
-
-    var res = TacticsSystem.Game_Interpreter_command301.call(this);
-    if (SceneManager.isNextScene(Scene_Battle) && TacticsSystem.isActive) {
-        SceneManager.pop();
-        this.setWaitMode('TS.battle');
-        SceneManager.push(Scene_Tactics);
-    }
-    return res;
-};
-
-TacticsSystem.Game_Interpreter_iterateEnemyIndex = Game_Interpreter.prototype.iterateEnemyIndex;
-Game_Interpreter.prototype.iterateEnemyIndex = function(param, callback) {
-    if ($gamePartyTs.inBattle()) {
-        if (param < 0) {
-            $gameTroopTs.members().forEach(callback);
-        } else {
-            var enemy = $gameTroopTs.members()[param];
-            if (enemy) {
-                callback(enemy);
-            }
-        }
-    } else {
-        TacticsSystem.Game_Interpreter_iterateEnemyIndex.call(this, param, callback);
-    }
-
-};
-
-//-----------------------------------------------------------------------------
 // Window_Base
 //
 // The superclass of all windows within the game.
@@ -4749,13 +4839,4 @@ Window_BattleLog.prototype.showNormalAnimation = function(targets, animationId, 
     } else {
         TacticsSystem.Window_BattleLog_showNormalAnimation.call(this, targets, animationId, mirror);
     }
-};
-
-//-----------------------------------------------------------------------------
-// Sprite_Character
-//
-// The sprite for displaying a character.
-
-Sprite_Character.prototype.character = function() {
-    return this._character;
 };
