@@ -102,6 +102,15 @@
  * @off No
  * @type Boolean
  *
+ * @param Fade Out End
+ * @parent Display Manager
+ * @desc Fade out at the end of the battle. You need to fade in
+ * with a command's event after the battle.
+ * @default true
+ * @on Yes
+ * @off No
+ * @type Boolean
+ *
  * @param Text Manager
  * @default
  *
@@ -217,7 +226,7 @@
  * the event to enemy in troops of the database. This will allow you to create
  * events with the conditions of the battle.
  *
- * -----------------------------------------------------------------------------
+ *
  * Note Tag
  *
  * There are several note tags to define parameters specific to the
@@ -234,7 +243,7 @@
  * <range:[[x1, y1], [x2, y2], ..., [xn, yn]] [skills, item]
  *    Set the range of an action.
  *
- * -----------------------------------------------------------------------------
+ *
  * Plugin Command
  *
  * TacticsSystem.BattleProcessing on/off
@@ -261,7 +270,7 @@
  * TacticsSystem.actorTurnEnd
  *     Ends the subject's turn.
  *
- * -----------------------------------------------------------------------------
+ *
  * Help
  * If you encounter a error, please report it in the following thread :
  *     https://forums.rpgmakerweb.com/index.php?threads/tactics-system-1-0.117600/
@@ -301,6 +310,7 @@ TacticsSystem.showStateIcon =         String(TacticsSystem.Parameters['Show Stat
 TacticsSystem.showBattleStart =       String(TacticsSystem.Parameters['Show Battle Start']).toBoolean();
 TacticsSystem.durationStartSprite =   Number(TacticsSystem.Parameters['Duration Start Sprite']);
 TacticsSystem.showInformationWindow = String(TacticsSystem.Parameters['Show Information Window']).toBoolean();
+TacticsSystem.fadeOutEnd =            String(TacticsSystem.Parameters['Fade Out End']).toBoolean();
 TacticsSystem.battleStartTerm =       String(TacticsSystem.Parameters['Battle Start Term']);
 TacticsSystem.endTurnTerm =           String(TacticsSystem.Parameters['End Turn Term']);
 TacticsSystem.damageTerm =            String(TacticsSystem.Parameters['Damage Term']);
@@ -1342,7 +1352,6 @@ TacticsManager.terminate = function() {
     $gameSwitches.setValue(TacticsSystem.battleStartId, false);
     $gamePlayer.setThrough(false);
     $gamePlayer.refresh();
-    // fade out battle argument
     $gameScreen.onBattleEnd();
     $gamePartyTs.onBattleEnd();
     $gameTroopTs.onBattleEnd();
@@ -1391,6 +1400,13 @@ Game_Screen.prototype.updateStart = function() {
 
 Game_Screen.prototype.onBattleEnd = function() {
     this._battleStart = true;
+    if (TacticsSystem.fadeOutEnd) {
+        this.startFadeOut(this.fadeSpeed());
+    }
+};
+
+Game_Screen.prototype.fadeSpeed = function() {
+    return 24;
 };
 
 //-----------------------------------------------------------------------------
@@ -3254,7 +3270,7 @@ Game_TroopTs.prototype.members = function() {
 
 Game_TroopTs.prototype.battleMembers = function() {
     return this.members().filter(function(enemy) {
-        return enemy.isAppeared();
+        return enemy.isAlive();
     });
 };
 
@@ -3427,9 +3443,10 @@ Scene_Tactics.prototype.createHelpWindow = function() {
 };
 
 Scene_Tactics.prototype.createSkillWindow = function() {
+    var wx = this._tacticsCommandWindow.x + this._tacticsCommandWindow.width;
     var ww = Graphics.boxWidth - this._tacticsCommandWindow.width;
     var wh = this._tacticsCommandWindow.fittingHeight(4);
-    this._skillWindow = new Window_TacticsSkill(0, this._tacticsCommandWindow.y, ww, wh);
+    this._skillWindow = new Window_TacticsSkill(wx, this._tacticsCommandWindow.y, ww, wh);
     this._skillWindow.setHelpWindow(this._helpWindow);
     this._skillWindow.setHandler('ok',     this.onSkillOk.bind(this));
     this._skillWindow.setHandler('cancel', this.onSkillCancel.bind(this));
@@ -3437,9 +3454,10 @@ Scene_Tactics.prototype.createSkillWindow = function() {
 };
 
 Scene_Tactics.prototype.createItemWindow = function() {
+    var wx = this._tacticsCommandWindow.x + this._tacticsCommandWindow.width;
     var ww = Graphics.boxWidth - this._tacticsCommandWindow.width;
     var wh = this._tacticsCommandWindow.fittingHeight(4);
-    this._itemWindow = new Window_TacticsItem(0, this._tacticsCommandWindow.y, ww, wh);
+    this._itemWindow = new Window_TacticsItem(wx, this._tacticsCommandWindow.y, ww, wh);
     this._itemWindow.setHelpWindow(this._helpWindow);
     this._itemWindow.setHandler('ok',     this.onItemOk.bind(this));
     this._itemWindow.setHandler('cancel', this.onItemCancel.bind(this));
@@ -3600,7 +3618,7 @@ Scene_Tactics.prototype.updateDestination = function() {
 };
 
 Scene_Tactics.prototype.isMapTouchOk = function() {
-    return this.isActive() && TacticsManager.isActive() && !this._mapWindow.active;
+    return this.isActive() && TacticsManager.isActive() && !this.isAnyInputWindowActive();
 };
 
 Scene_Tactics.prototype.processMapTouch = function() {
@@ -3646,7 +3664,6 @@ Scene_Tactics.prototype.commandAttack = function() {
     TacticsManager.setupCombat(action);
     TacticsManager.refreshRedCells(action);
     this.onSelectAction();
-    TacticsManager.processTarget();
 };
 
 Scene_Tactics.prototype.commandSkill = function() {
@@ -3724,7 +3741,6 @@ Scene_Tactics.prototype.onSkillOk = function() {
     action.setSkill(skill.id);
     TacticsManager.actor().setLastBattleSkill(skill);
     this.onSelectAction();
-    TacticsManager.processTarget();
 };
 
 Scene_Tactics.prototype.onSkillCancel = function() {
@@ -3741,7 +3757,6 @@ Scene_Tactics.prototype.onItemOk = function() {
     action.setItem(item.id);
     $gameParty.setLastItem(item);
     this.onSelectAction();
-    TacticsManager.processTarget();
 };
 
 Scene_Tactics.prototype.onItemCancel = function() {
@@ -3752,9 +3767,15 @@ Scene_Tactics.prototype.onItemCancel = function() {
 };
 
 Scene_Tactics.prototype.onSelectAction = function() {
+    var action = TacticsManager.inputtingAction();
     this._skillWindow.hide();
     this._itemWindow.hide();
     this._tacticsCommandWindow.close();
+    if (!action.needsSelection()) {
+        TacticsManager.setupAction();
+    } else {
+        TacticsManager.processTarget();
+    }
 };
 
 Scene_Tactics.prototype.endCommandSelection = function() {
