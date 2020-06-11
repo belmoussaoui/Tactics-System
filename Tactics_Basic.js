@@ -92,6 +92,7 @@
  * @parent Display Manager
  * @desc The duration to display the start sprite.
  * @default 300
+ * @min 0
  * @type Number
  *
  * @param Show Information Window
@@ -107,6 +108,14 @@
  * @desc Fade out at the end of the battle. You need to fade in
  * with a command's event after the battle.
  * @default true
+ * @on Yes
+ * @off No
+ * @type Boolean
+ *
+ * @param Set Transparent Unit
+ * @parent Display Manager
+ * @desc Set Transparent to true at the end of the battle.
+ * @default false
  * @on Yes
  * @off No
  * @type Boolean
@@ -311,6 +320,7 @@ TacticsSystem.showBattleStart =       String(TacticsSystem.Parameters['Show Batt
 TacticsSystem.durationStartSprite =   Number(TacticsSystem.Parameters['Duration Start Sprite']);
 TacticsSystem.showInformationWindow = String(TacticsSystem.Parameters['Show Information Window']).toBoolean();
 TacticsSystem.fadeOutEnd =            String(TacticsSystem.Parameters['Fade Out End']).toBoolean();
+TacticsSystem.setTransparentUnit =    String(TacticsSystem.Parameters['Set Transparent Unit']).toBoolean();
 TacticsSystem.battleStartTerm =       String(TacticsSystem.Parameters['Battle Start Term']);
 TacticsSystem.endTurnTerm =           String(TacticsSystem.Parameters['End Turn Term']);
 TacticsSystem.damageTerm =            String(TacticsSystem.Parameters['Damage Term']);
@@ -357,8 +367,10 @@ TacticsSystem.turnCountVarId =        Number(TacticsSystem.Parameters['Turn Coun
                 this.selectorEvent(args[0]);
                 break;
             case 'TacticsSystem.UnitEndAction':
-                TacticsManager.unitEndAction();
+                this.unitEndAction();
                 break;
+            case 'TacticsSystem.CloseCommandWindow':
+                this.closeCommandWindow();
         }
     };
 })();
@@ -534,6 +546,10 @@ TacticsManager.setEventCallback = function(callback) {
 
 TacticsManager.setLogWindow = function(logWindow) {
     this._logWindow = logWindow;
+};
+
+TacticsManager.setCommandWindow = function(commandWindow) {
+    this._commandWindow = commandWindow;
 };
 
 TacticsManager.setActorWindow = function(actorWindow) {
@@ -907,6 +923,10 @@ TacticsManager.refreshInfo = function() {
     } else {
         this._infoWindow.close();
     }
+};
+
+TacticsManager.closeCommandWindow = function() {
+    this._commandWindow.close();
 };
 
 TacticsManager.updateStart = function() {
@@ -1349,10 +1369,10 @@ TacticsManager.onAllTurnEnd = function() {
 };
 
 TacticsManager.terminate = function() {
+    $gameScreen.onBattleEnd();
     $gameSwitches.setValue(TacticsSystem.battleStartId, false);
     $gamePlayer.setThrough(false);
     $gamePlayer.refresh();
-    $gameScreen.onBattleEnd();
     $gamePartyTs.onBattleEnd();
     $gameTroopTs.onBattleEnd();
     $gamePartyTs.clear();
@@ -2069,6 +2089,15 @@ Game_Battler.prototype.canNextAction = function() {
     return this.nextAction() && this.isActor() && !this.isAutoBattle();
 };
 
+TacticsSystem.Game_Battler_onBattleEnd = Game_Battler.prototype.onBattleEnd;
+Game_Battler.prototype.onBattleEnd = function() {
+    TacticsSystem.Game_Battler_onBattleEnd.call(this);
+    if (TacticsSystem.setTransparentUnit) {
+        this.event().setTransparent(true);
+        this.event().setThrough(true);
+    }
+};
+
 //-----------------------------------------------------------------------------
 // Game_Actor
 //
@@ -2266,12 +2295,12 @@ Game_Enemy.prototype.indexTs = function() {
 Game_Enemy.prototype.makeMoves = function() {
     Game_Battler.prototype.makeMoves.call(this);
     if (!this.isConfused()) {
-        this.findAction();
+        this.findPosition();
     }
     this.makeShortestMoves();
 };
 
-Game_Enemy.prototype.findAction = function() {
+Game_Enemy.prototype.findPosition = function() {
     // Rewrite this if you want to change the target search behavior.
     this._rate = 0;
     var saveX = this.tx;
@@ -3086,7 +3115,12 @@ Game_Interpreter.prototype.selectorEvent = function(eventId) {
 
 // Unit End Action
 Game_Interpreter.prototype.unitEndAction = function() {
-    TacticsManger.endAction();
+    TacticsManager.endAction();
+};
+
+// Close Command Window
+Game_Interpreter.prototype.closeCommandWindow = function() {
+    TacticsManager.closeCommandWindow();
 };
 
 //-----------------------------------------------------------------------------
@@ -3375,6 +3409,7 @@ Scene_Tactics.prototype.createDisplayObjects = function() {
     this.createWindowLayer();
     this.createAllWindows();
     TacticsManager.setLogWindow(this._logWindow);
+    TacticsManager.setCommandWindow(this._tacticsCommandWindow);
     TacticsManager.setActorWindow(this._actorWindow);
     TacticsManager.setEnemyWindow(this._enemyWindow);
     TacticsManager.setInfoWindow(this._infoWindow);
@@ -3695,7 +3730,7 @@ Scene_Tactics.prototype.commandEvent = function() {
     var event = $gameMap.event(eventId);
     event.start();
     TacticsManager.turnTowardCharacter(event);
-    this.onSelectAction();
+    this._tacticsCommandWindow.close();
 };
 
 Scene_Tactics.prototype.commandWait = function() {
@@ -4694,7 +4729,7 @@ Window_TacticsInfo.prototype.initialize = function() {
 };
 
 Window_TacticsInfo.prototype.windowWidth = function() {
-    return 816/2 - 100;
+    return 816 / 2 - 100;
 };
 
 Window_TacticsInfo.prototype.windowHeight = function() {
