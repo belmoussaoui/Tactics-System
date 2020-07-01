@@ -2903,7 +2903,7 @@ Game_Enemy.prototype.findPosition = function() {
             return this.isActionValid(a);
         }, this);
         var sum = actionList.reduce(function(r, a) {
-            return r + a.rating * 3;
+            return r + a.rating;
         }, 0);
         if (sum > this._rate) {
             this._rate = sum;
