@@ -20,13 +20,14 @@
  * You gain the enemy rewards when the enemy is dead.
  * 
  * You gain action rewards when you process an action. The reward for an action is
- * defined by the tag <exp formula:b.exp() / 10> in the database for an item or
+ * defined by the tag <Exp Formula:b.exp() / 10> in the database for an item or
  * skill.
  *
  * -----------------------------------------------------------------------------
  * To Do
  *    - no rewards if an action is missed
  *    - display golds and drop items in the window
+ *    - display level up window
  *
  * -----------------------------------------------------------------------------
  * Help
@@ -40,56 +41,56 @@ ExpGain.Parameters = PluginManager.parameters('Tactics_Rewards');
 ExpGain.attackExpFormula = String(ExpGain.Parameters['Attack Exp Formula']);
 
 //-----------------------------------------------------------------------------
-// Scene_Tactics
+// Scene_Battle
 //
 // The scene class of the battle tactics system screen.
 
-ExpGain.Scene_Tactics_createAllWindows = Scene_Tactics.prototype.createAllWindows;
-Scene_Tactics.prototype.createAllWindows = function() {
-    ExpGain.Scene_Tactics_createAllWindows.call(this);
+ExpGain.Scene_Battle_createAllWindows = Scene_Battle.prototype.createAllWindows;
+Scene_Battle.prototype.createAllWindows = function() {
+    ExpGain.Scene_Battle_createAllWindows.call(this);
     this.createExpWindow();
 };
 
-Scene_Tactics.prototype.createExpWindow = function() {
+Scene_Battle.prototype.createExpWindow = function() {
     this._expWindow = new Window_Exp();
     this._expWindow.x = Graphics.width / 2 - this._expWindow.width / 2;
     this._expWindow.y = Graphics.height / 2 - this._expWindow.height / 2;
     this.addWindow(this._expWindow);
 };
 
-ExpGain.Scene_Tactics_createDisplayObjects = Scene_Tactics.prototype.createDisplayObjects;
-Scene_Tactics.prototype.createDisplayObjects = function() {
-    ExpGain.Scene_Tactics_createDisplayObjects.call(this);
-    TacticsManager.setExpWindow(this._expWindow);
+ExpGain.Scene_Battle_createDisplayObjects = Scene_Battle.prototype.createDisplayObjects;
+Scene_Battle.prototype.createDisplayObjects = function() {
+    ExpGain.Scene_Battle_createDisplayObjects.call(this);
+    BattleManager.setExpWindow(this._expWindow);
 };
 
-ExpGain.Scene_Tactics_isAnyInputWindowActive = Scene_Tactics.prototype.isAnyInputWindowActive;
-Scene_Tactics.prototype.isAnyInputWindowActive = function() {
-    return ExpGain.Scene_Tactics_isAnyInputWindowActive.call(this) || this._expWindow.active;
+ExpGain.Scene_Battle_isAnyInputWindowActive = Scene_Battle.prototype.isAnyInputWindowActive;
+Scene_Battle.prototype.isAnyInputWindowActive = function() {
+    return ExpGain.Scene_Battle_isAnyInputWindowActive.call(this) || this._expWindow.active;
 };
 
 //-----------------------------------------------------------------------------
-// TacticsManager
+// BattleManager
 //
 // The static class that manages battle progress.
 
-ExpGain.TacticsManager_setup = TacticsManager.setup;
-TacticsManager.setup = function(troopId, canEscape, canLose) {
-    ExpGain.TacticsManager_setup.call(this, troopId, canEscape, canLose);
+ExpGain.BattleManager_setup = BattleManager.setup;
+BattleManager.setup = function(troopId, canEscape, canLose) {
+    ExpGain.BattleManager_setup.call(this, troopId, canEscape, canLose);
     this.makeRewards();
 };
 
-TacticsManager.setExpWindow = function(expWindow) {
+BattleManager.setExpWindow = function(expWindow) {
     this._expWindow = expWindow;
 };
 
-ExpGain.TacticsManager_invokeAction = TacticsManager.invokeAction;
-TacticsManager.invokeAction = function(subject, target) {
-    ExpGain.TacticsManager_invokeAction.call(this, subject, target);
+ExpGain.BattleManager_invokeAction = BattleManager.invokeAction;
+BattleManager.invokeAction = function(subject, target) {
+    ExpGain.BattleManager_invokeAction.call(this, subject, target);
     this.invokeRewards(target);
 };
 
-TacticsManager.invokeRewards = function(target) {
+BattleManager.invokeRewards = function(target) {
     if (this._subject.isActor()) {
         if (target.isEnemy() && target.isDead()) {
             this.gainRewardsEnemy(target);
@@ -99,18 +100,18 @@ TacticsManager.invokeRewards = function(target) {
     }
 };
 
-TacticsManager.gainRewardsEnemy = function(enemy) {
+BattleManager.gainRewardsEnemy = function(enemy) {
     this._rewards.gold += enemy.gold();
     this._rewards.exp += enemy.exp();
     this._rewards.items = this._rewards.items.concat(enemy.makeDropItems());
 };
 
-TacticsManager.gainRewardsAction = function(target) {
+BattleManager.gainRewardsAction = function(target) {
     this._rewards.exp += this._action.evalExpFormula(target);
 };
 
-ExpGain.TacticsManager_nextAction = TacticsManager.nextAction;
-TacticsManager.nextAction = function() {
+ExpGain.BattleManager_nextAction = BattleManager.nextAction;
+BattleManager.nextAction = function() {
     if (this._rewards.exp > 0 && this._subject.isActor()) {
         this._infoWindow.close();
         this._expWindow.setup(this._subject);
@@ -119,22 +120,22 @@ TacticsManager.nextAction = function() {
         this.gainRewards();
         this.makeRewards();
     }
-    ExpGain.TacticsManager_nextAction.call(this);
+    ExpGain.BattleManager_nextAction.call(this);
 };
 
-TacticsManager.makeRewards = function() {
+BattleManager.makeRewards = function() {
     this._rewards = {};
     this._rewards.gold = 0;
     this._rewards.exp = 0;
     this._rewards.items = [];
 };
 
-TacticsManager.gainRewards = function() {
+BattleManager.gainRewards = function() {
     this.gainGold();
     this.gainDropItems();
 };
 
-TacticsManager.displayRewards = function() {
+BattleManager.displayRewards = function() {
 };
 
 //-----------------------------------------------------------------------------
@@ -147,7 +148,7 @@ Game_Action.prototype.attackExpFormula = function() {
 };
 
 Game_Action.prototype.expFormula = function() {
-    return this.item().meta['exp formula'];
+    return this.item().meta['Exp Formula'];
 };
 
 Game_Action.prototype.evalExpFormula = function(target) {
@@ -255,7 +256,9 @@ Window_Exp.prototype.isTriggered = function() {
 
 Window_Exp.prototype.updateGaugeExp = function() {
     this._showCount++;
+    this._soundCount--;
     if (this._showCount > 30) {
+        SoundManager.playOk();
         var currentExp = this._tempActor.currentExp();
         var gainExp = this._tempActor.gainRate();
         var level = this._tempActor.level;
