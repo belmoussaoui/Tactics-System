@@ -185,21 +185,21 @@
  * @desc The switch id to set if the battle has started.
  * @default 1
  * @min 1
- * @type Number
+ * @@type switch
  *
  * @param Player Phase Id
  * @parent Progression Manager
  * @desc The switch id to set if it's the player phase.
  * @default 2
  * @min 1
- * @type Number
+ * @@type switch
  *
  * @param Enemy Phase Id
  * @parent Progression Manager
  * @desc The switch id to set if it's the enemy phase.
  * @default 3
  * @min 1
- * @type Number
+ * @@type switch
  *
  * @param Current Phase Id
  * @parent Progression Manager
@@ -207,7 +207,7 @@
  * 1: startPhase, 2 : playerPhase, 3 : enemyPhase, 4 : battleEnd (can't to be use)
  * @default 1
  * @min 1
- * @type Number
+ * @@type variable
  *
  * @param Current Player Phase Id
  * @parent Progression Manager
@@ -215,7 +215,7 @@
  * 1: explore, 2 : select, 3 : target
  * @default 2
  * @min 1
- * @type Number
+ * @@type variable
  *
  * @param Current Battle Phase Id
  * @parent Progression Manager
@@ -223,14 +223,14 @@
  * 1: start, 2 : move, 3 : action, 4 : turnEnd (can't to be use)
  * @default 3
  * @min 1
- * @type Number
+ * @@type variable
  *
  * @param Turn Count Id
  * @parent Progression Manager
  * @desc The variable id to set the turn count of battle.
  * @default 4
  * @min 1
- * @type Number
+ * @@type variable
  *
  * @help
  * -----------------------------------------------------------------------------
@@ -303,7 +303,7 @@
 
 var TacticsSystem = TacticsSystem || {};
 TacticsSystem.Parameters = PluginManager.parameters('Tactics_Basic');
-TacticsSystem.clearAll = true; // in game troop
+TacticsSystem.clearAll = true; // in game system
 
  /**
  * Converts a boolean string.
