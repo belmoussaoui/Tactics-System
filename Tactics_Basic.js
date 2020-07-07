@@ -14,23 +14,19 @@
  * @dir img/system/
  * @default Selector
  * @require 1
- * @type File
+ * @type file
  *
  * @param Selector Speed
  * @parent Basic Parameters
- * @desc The selector speed. 1: Slow, 2: Normal, 3: Fast
+ * @desc The selector speed.
  * @default 2
- * @min 1
- * @max 3
- * @type Number
- *
- * @param Selector Speed
- * @parent Basic Parameters
- * @desc The selector speed. 1: Slow, 2: Normal, 3: Fast
- * @default 2
- * @min 1
- * @max 3
- * @type Number
+ * @option Slow
+ * @value 1
+ * @option Normal
+ * @value 2
+ * @option Fast
+ * @value 3
+ * @type select
  *
  * @param Grid Opacity
  * @parent Basic Parameters
@@ -38,18 +34,18 @@
  * @default 30
  * @min 0
  * @max 255
- * @type Number
+ * @type number
  *
  * @param Move Points
  * @parent Basic Parameters
- * @desc The movement distance of a unit.
+ * @desc The movement distance of a unit if undefined.
  * @default 5
  * @min 0
- * @type Number
+ * @type number
  *
  * @param Action Range
  * @parent Basic Parameters
- * @desc The range distance of skill or item.
+ * @desc The range distance of skill or item if undefined.
  * @default 1
  *
  * @param Wait Skill Id
@@ -57,7 +53,7 @@
  * @desc The wait skill id in the database if the unit can't shield.
  * @default 7
  * @min 1
- * @type Number
+ * @type skill
  *
  * @param Tiles Color
  *
@@ -84,7 +80,7 @@
  * @default true
  * @on Yes
  * @off No
- * @type Boolean
+ * @type boolean
  *
  * @param Show State Icon
  * @parent Display Manager
@@ -92,7 +88,7 @@
  * @default true
  * @on Yes
  * @off No
- * @type Boolean
+ * @type boolean
  *
  * @param Show Battle Start
  * @parent Display Manager
@@ -100,14 +96,14 @@
  * @default true
  * @on Yes
  * @off No
- * @type Boolean
+ * @type boolean
  *
  * @param Duration Start Sprite
  * @parent Display Manager
  * @desc The duration to display the start sprite.
  * @default 300
  * @min 0
- * @type Number
+ * @type number
  *
  * @param Show Information Window
  * @parent Display Manager
@@ -115,7 +111,7 @@
  * @default true
  * @on Yes
  * @off No
- * @type Boolean
+ * @type boolean
  *
  * @param Fade Out End
  * @parent Display Manager
@@ -124,7 +120,7 @@
  * @default true
  * @on Yes
  * @off No
- * @type Boolean
+ * @type boolean
  *
  * @param Set Transparent Unit
  * @parent Display Manager
@@ -132,7 +128,7 @@
  * @default true
  * @on Yes
  * @off No
- * @type Boolean
+ * @type boolean
  *
  * @param Text Manager
  * @default
@@ -262,7 +258,7 @@
  *    Set the distance of action of an enemy. Setting it to 1 allows
  *    to create enemies that don't move.s
  *
- * <Range:int>, <Range:int int>
+ * <Range:int>, <Range:int int>, <Range:int int shape> shape=[diamond,rectangle,line]
  *    Set the range of an action.
  *
  * <Name:string>
@@ -2191,7 +2187,10 @@ Game_Action.prototype.updateRange = function(item, x, y) {
         data[1] = data[0];
         data[0] = 0;
     }
-    this._range = this.createRange(parseInt(data[0]), parseInt(data[1]), x, y);
+    if (data[2] === undefined) {
+        data[2] = 'diamond';
+    }
+    this._range = this.createRange(parseInt(data[0]), parseInt(data[1]), x, y, data[2]);
     if (this.isForUser()) {
         this._range = [[x, y]];
     }
@@ -2202,13 +2201,25 @@ Game_Action.prototype.extractRangeData = function (object) {
     return data.trim().split(' ');
 };
 
-Game_Action.prototype.createRange = function(d1, d2, x, y) {
+Game_Action.prototype.createRange = function(d1, d2, x, y, shape) {
     var range = [];
     for (var i = x - d2; i <= x + d2; i++) {
         for (var j = y - d2; j <= y + d2; j++) {
-            if (Math.abs(i - x) + Math.abs(j - y) <= d2) {
-                if (Math.abs(i - x) + Math.abs(j - y) > d1) {
+            if (Math.abs(i - x) + Math.abs(j - y) > d1) {
+                switch (shape) {
+                case 'diamond':
+                    if (Math.abs(i - x) + Math.abs(j - y) <= d2) {
+                       range.push([i, j]);
+                    }
+                    break;
+                case 'rectangle':
                     range.push([i, j]);
+                    break;
+                case 'line':
+                    if (i === x || j === y) {
+                        range.push([i, j]);
+                    }
+                    break;
                 }
             }
         }
@@ -4800,8 +4811,9 @@ Window_TacticsInfo.prototype.numVisibleRows = function() {
     return 3;
 };
 
-Window_TacticsInfo.prototype.open = function(battlerTS) {
-    this.setActor(battlerTS);
+Window_TacticsInfo.prototype.open = function(battler) {
+    var actor = JsonEx.makeDeepCopy(battler);
+    this.setActor(actor);
     this.refresh()
     Window_Base.prototype.open.call(this);
 };
