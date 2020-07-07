@@ -100,6 +100,18 @@ BattleManager.invokeRewards = function(target) {
     }
 };
 
+ExpGain.BattleManager_invokeCounterAttack = BattleManager.invokeCounterAttack;
+BattleManager.invokeCounterAttack = function(subject, target) {
+    ExpGain.BattleManager_invokeCounterAttack.call(this, subject, target);
+    if (target.isActor()) {
+        if (subject.isEnemy() && subject.isDead()) {
+            this.gainRewardsEnemy(subject);
+        } else {
+            this.gainRewardsAction(subject)
+        }
+    }
+};
+
 BattleManager.gainRewardsEnemy = function(enemy) {
     this._rewards.gold += enemy.gold();
     this._rewards.exp += enemy.exp();
@@ -112,10 +124,14 @@ BattleManager.gainRewardsAction = function(target) {
 
 ExpGain.BattleManager_nextAction = BattleManager.nextAction;
 BattleManager.nextAction = function() {
-    if (this._rewards.exp > 0 && this._subject.isActor()) {
+    if (this._rewards.exp > 0) {
         this._infoWindow.close();
-        this._expWindow.setup(this._subject);
-        this._subject.gainExp(this._rewards.exp, false);
+        var actor = this._subject;
+        if (!this._subject.isActor()) {
+            actor = this._targets[this._targetIndex-1];
+        }
+        this._expWindow.setup(actor);
+        actor.gainExp(this._rewards.exp, false);
         this.displayRewards();
         this.gainRewards();
         this.makeRewards();
