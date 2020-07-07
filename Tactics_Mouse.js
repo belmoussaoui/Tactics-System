@@ -96,26 +96,6 @@ Input.update = function() {
 };
 
 /**
- * @static
- * @method _updateGamepadState
- * @param {Gamepad} gamepad
- * @param {Number} index
- * @private
- */
-var Input_updateGamepadState = Input._updateGamepadState
-Input._updateGamepadState = function(gamepad) {
-    Input_updateGamepadState.call(this, gamepad);
-    for (var j = 0; j < newState.length; j++) {
-        if (newState[j] !== lastState[j]) {
-            var buttonName = this.gamepadMapper[j];
-            if (buttonName) {
-                TouchInput.setActive(false);
-            }
-        }
-    }
-};
-
-/**
  * [read-only] The x coordinate on the canvas area of the latest touch event.
  *
  * @static
