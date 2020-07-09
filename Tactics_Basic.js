@@ -1502,6 +1502,7 @@ BattleManager.updateEnemyPhase = function() {
     this._subject = this._enemiesOrder.shift();
     $gameTroop.setupTactics([this._subject]);
     this._subject.makeMoves();
+    this._subject.findMoves();
     this._subject.makeActions();
     $gameMap.clearTiles();
     if (this._subject.isPattern()) {
@@ -1580,8 +1581,6 @@ BattleManager.endAction = function() {
     $gameMap.clearTiles();
     $gameTemp.setCancel(true);
     var subject = this._subject;
-    $gameParty.setupTactics($gamePartyTs.members());
-    $gameTroop.setupTactics($gameTroopTs.members());
     subject.onAllActionsEnd();
     this._logWindow.displayAutoAffectedStatus(subject);
     this._logWindow.displayCurrentState(subject);
@@ -1590,6 +1589,8 @@ BattleManager.endAction = function() {
 };
 
 BattleManager.updateClose = function() {
+    $gameParty.setupTactics($gamePartyTs.members());
+    $gameTroop.setupTactics($gameTroopTs.members());
     this._battlePhase = 'start';
     this._subject.onActionEnd();
     this._subject = null;
@@ -2663,13 +2664,8 @@ Game_Battler.prototype.isConfusedRangeOk = function(action) {
     }
 };
 
-TacticsSystem.Game_Battler_performCollapse = Game_Battler.prototype.performCollapse;
 Game_Battler.prototype.performCollapse = function() {
-    if ($gamePartyTs.inBattle()) {
-        this.event().setThrough(true);
-    } else {
-        TacticsSystem.Game_Battler_performCollapse.call(this);
-    }
+    this.event().setThrough(true);
 };
 
 Game_Battler.prototype.performSelect = function() {
@@ -2679,7 +2675,7 @@ Game_Battler.prototype.performSelect = function() {
 Game_Battler.prototype.setPosition = function(x, y) {
     this.event().setPosition(x, y);
     this._tx = x;
-    this._ty = y
+    this._ty = y;
 };
 
 Game_Battler.prototype.canNextAction = function() {
@@ -2810,9 +2806,7 @@ Game_Actor.prototype.inputtingAction = function() {
 TacticsSystem.Game_Actor_performCollapse = Game_Actor.prototype.performCollapse;
 Game_Actor.prototype.performCollapse = function() {
     TacticsSystem.Game_Actor_performCollapse.call(this);
-    if ($gamePartyTs.inBattle()) {
-        this.requestEffect('bossCollapse');
-    }
+    this.requestEffect('bossCollapse');
 };
 
 TacticsSystem.Game_Actor_isBattleMember = Game_Actor.prototype.isBattleMember;
@@ -2894,6 +2888,9 @@ Game_Enemy.prototype.indexTs = function() {
 
 Game_Enemy.prototype.makeMoves = function() {
     Game_Battler.prototype.makeMoves.call(this);
+};
+
+Game_Enemy.prototype.findMoves = function() {
     if (!this.isConfused()) {
         this.findPosition();
     }
@@ -2969,7 +2966,7 @@ Game_Party.prototype.setupTactics = function(actors) {
             this.removeActor(actorId);
         }
     }, this);
-    this._actors = actorsId.concat(this._actors);
+    this._actors = actorsId;
 };
 
 Game_Party.prototype.setMaxBattleMembers = function() {
@@ -3896,10 +3893,12 @@ Scene_Map.prototype.updateEncounterEffect = function() {
         var startTimer = this.encounterEffectSpeed();
         if (timer === startTimer - 1) {
             this.startFadeOut(this.slowFadeSpeed());
-            BattleManager.createGameObjects();
         }
         if (timer === Math.floor(startTimer / 2)) {
             BattleManager.playBattleBgm();
+        }
+        if (timer === 1) {
+            BattleManager.createGameObjects();
         }
     }
 };
@@ -4869,7 +4868,7 @@ Window_TacticsInfo.prototype.drawCri = function(actor, x, y) {
     this.drawText(TacticsSystem.criticalRateTerm, x, y, 160);
     this.resetTextColor();
     var action = BattleManager.inputtingAction();
-    var crit = action.itemCri(actor) * 100 + '%';
+    var crit = Math.round(action.itemCri(actor) * 100) + '%';
     this.drawText(crit, x + 180, y, 60, 'right');
 };
 
