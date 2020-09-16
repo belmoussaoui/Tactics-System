@@ -55,6 +55,14 @@
  * @min 1
  * @type skill
  *
+ * @param Auto Turn End
+ * @parent Basic Parameters
+ * @desc Automatically end the player turn when all units have played.
+ * @default true
+ * @on Yes
+ * @off No
+ * @type boolean
+ *
  * @param Tiles Color
  *
  * @param Move Scope Color
@@ -323,6 +331,7 @@ TacticsSystem.gridOpacity =           Number(TacticsSystem.Parameters['Grid Opac
 TacticsSystem.mvp =                   Number(TacticsSystem.Parameters['Move Points']);
 TacticsSystem.actionRange =           String(TacticsSystem.Parameters['Action Range']);
 TacticsSystem.waitSkillId =           Number(TacticsSystem.Parameters['Wait Skill Id']);
+TacticsSystem.autoTurnEnd =           String(TacticsSystem.Parameters['Auto Turn End']).toBoolean();
 TacticsSystem.moveScopeColor =        String(TacticsSystem.Parameters['Move Scope Color']);
 TacticsSystem.allyScopeColor =        String(TacticsSystem.Parameters['Ally Scope Color']);
 TacticsSystem.enemyScopeColor =       String(TacticsSystem.Parameters['Enemy Scope Color']);
@@ -1469,7 +1478,7 @@ BattleManager.updateStartPlayer = function() {
     this._subject = this._playersOrder.shift();
     if (this._subject) {
         this.restrictedPhase();
-    } else if ($gamePartyTs.isPhase()) {
+    } else if ($gamePartyTs.isPhase() || !TacticsSystem.autoTurnEnd) {
         $gameSelector.setTransparent(false);
         this._battlePhase = 'explore';
     } else {
@@ -2957,10 +2966,11 @@ Game_Unit.prototype.onBattleStart = function() {
 Game_Party.prototype.setupTactics = function(actors) {
     var actorsId = [];
     for (var i = 0; i < actors.length; i++) {
-        actorsId.push(actors[i].actorId());
+        if (actorsId.indexOf(actors[i].actorId()) < 0) {
+            actorsId.push(actors[i].actorId());
+        }
     }
-    this._maxBattleMembers = actors.length;
-
+    this._maxBattleMembers = actorsId.length;
     actorsId.forEach(function(actorId) {
         if (this._actors.contains(actorId)) {
             this.removeActor(actorId);
@@ -2968,6 +2978,7 @@ Game_Party.prototype.setupTactics = function(actors) {
     }, this);
     this._actors = actorsId;
 };
+
 
 Game_Party.prototype.setMaxBattleMembers = function() {
     this._maxBattleMembers = this.allMembers().length;
@@ -2991,7 +3002,12 @@ Game_Party.prototype.memberId = function(partyId) {
 // The game object class for a troop and the battle-related data.
 
 Game_Troop.prototype.setupTactics = function(enemies) {
-    this._enemies = enemies;
+    this._enemies = [];
+    enemies.forEach(function(member) {
+        if (!member.isBattleMember()) {
+            this._enemies.push(member);
+        }
+    }, this)
 };
 
 TacticsSystem.Game_Troop_meetsConditions = Game_Troop.prototype.meetsConditions;
