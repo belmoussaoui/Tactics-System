@@ -138,6 +138,14 @@
  * @off No
  * @type boolean
  *
+ * @param Show Face Unit
+ * @parent Display Manager
+ * @desc Show the face of unit otherwise display the charset.
+ * @default true
+ * @on Yes
+ * @off No
+ * @type boolean
+ *
  * @param Text Manager
  * @default
  *
@@ -342,6 +350,7 @@ TacticsSystem.durationStartSprite =   Number(TacticsSystem.Parameters['Duration 
 TacticsSystem.showInformationWindow = String(TacticsSystem.Parameters['Show Information Window']).toBoolean();
 TacticsSystem.fadeOutEnd =            String(TacticsSystem.Parameters['Fade Out End']).toBoolean();
 TacticsSystem.setTransparentUnit =    String(TacticsSystem.Parameters['Set Transparent Unit']).toBoolean();
+TacticsSystem.showFaceUnit =          String(TacticsSystem.Parameters['Show Face Unit']).toBoolean();
 TacticsSystem.battleStartTerm =       String(TacticsSystem.Parameters['Battle Start Term']);
 TacticsSystem.endTurnTerm =           String(TacticsSystem.Parameters['End Turn Term']);
 TacticsSystem.damageTerm =            String(TacticsSystem.Parameters['Damage Term']);
@@ -4688,11 +4697,28 @@ Window_TacticsStatus.prototype.refresh = function() {
 
 Window_TacticsStatus.prototype.drawBattlerStatus = function() {
     if (this._battler.isActor()) {
-        this.drawActorFace(this._battler, 0, 0, Window_Base._faceWidth, Window_Base._faceHeight);
+        this.drawActorFrame();
         this.drawActorSimpleStatus(this._battler, 0, 0, 376);
     } else {
-        this.drawEnemyImage(this._battler, 0, 0);
+        this.drawEnemyFrame();
         this.drawEnemySimpleStatus(this._battler, 0, 0, 376);
+    }
+};
+
+Window_TacticsStatus.prototype.drawActorFrame = function() {
+     if (TacticsSystem.showFaceUnit) {
+        this.drawActorFace(this._battler, 0, 0, Window_Base._faceWidth, Window_Base._faceHeight);
+    } else {
+        this.drawActorCharacter(this._battler, 48+24, 48*2);
+    }
+};
+
+Window_TacticsStatus.prototype.drawEnemyFrame = function() {
+    if (TacticsSystem.showFaceUnit) {
+        this.drawEnemyImage(this._battler, 0, 0);
+    } else {
+        var event = this._battler.event();
+        this.drawCharacter(event.characterName(), event.characterIndex(), 48+24, 48*2);
     }
 };
 
