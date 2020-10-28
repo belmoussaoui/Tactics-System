@@ -2479,6 +2479,9 @@ Game_Battler.prototype.tparam = function(paramString) {
     var param = null;
     for (var i = 0; i < this.currentData().length; i++) {
         param = this.currentData()[i].meta[paramString]
+        if (param) {
+            break;
+        }
     }
     if (param) {
         param.replace(/\s/g, '');
