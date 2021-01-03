@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Add-on to display the combat animation scene.
- * Requires: TacticsSystem.js
+ * Requires: Tactics_Basic.js
  * @author Bilal El Moussaoui (https://twitter.com/arleq1n)
  *
  *
@@ -18,8 +18,6 @@
  * For more information, please consult :
  *   - https://forums.rpgmakerweb.com/index.php?threads/tactics-system-1-0.117600/
  */
-
-(function() {
 
 var CombatScene = CombatScene || {};
 CombatScene.Parameters = PluginManager.parameters('Tactics_Combat');
@@ -91,6 +89,7 @@ Scene_Combat.prototype.create = function() {
 Scene_Combat.prototype.start = function() {
     Scene_Base.prototype.start.call(this);
     this.startFadeIn(this.fadeSpeed(), false);
+    this.updateSubjectStatusWindow();
 };
 
 Scene_Combat.prototype.createDisplayObjects = function() {
@@ -109,9 +108,6 @@ Scene_Combat.prototype.createAllWindows = function() {
     this.createLogWindow();
     this.createStatusWindow();
     this.createMessageWindow();
-    if (BattleManager._expWindow) {
-        this.addChild(BattleManager._expWindow)
-    }
 };
 
 Scene_Combat.prototype.createLogWindow = function() {
@@ -124,10 +120,10 @@ Scene_Combat.prototype.createLogWindow = function() {
 Scene_Combat.prototype.createStatusWindow = function() {
     this._actorWindow = new Window_TacticsStatus();
     this._actorWindow.x = Graphics.boxWidth / 2 + 32;
-    this.addWindow(this._actorWindow);
+    this.addWindow(BattleManager._actorWindow);
     this._enemyWindow = new Window_TacticsStatus();
     this._enemyWindow.x = Graphics.boxWidth / 2 - this._enemyWindow.width - 32;
-    this.addWindow(this._enemyWindow);
+    this.addWindow(BattleManager._enemyWindow);
 };
 
 Scene_Combat.prototype.createMessageWindow = function() {
@@ -141,10 +137,9 @@ Scene_Combat.prototype.createMessageWindow = function() {
 Scene_Combat.prototype.update = function() {
     var active = this.isActive();
     $gameScreen.update();
-    this.updateSubjectStatusWindow();
-    if (!BattleManager._expWindow || !BattleManager._expWindow.isOpen()) {
-        BattleManager.update();
-    }
+    BattleManager._actorWindow.refresh();
+    BattleManager._enemyWindow.refresh();
+    BattleManager.update();
     Scene_Base.prototype.update.call(this);
 };
 
@@ -156,11 +151,11 @@ Scene_Combat.prototype.updateSubjectStatusWindow = function() {
     var select = BattleManager.subject();
     var target = $gameSelector.select();
     if (select.isActor()) {
-        this._actorWindow.open(select);
-        this._enemyWindow.open(target);
+        BattleManager._actorWindow.open(select);
+        BattleManager._enemyWindow.open(target);
     } else {
-        this._actorWindow.open(target);
-        this._enemyWindow.open(select);
+        BattleManager._actorWindow.open(target);
+        BattleManager._enemyWindow.open(select);
     }
 };
 
@@ -189,7 +184,7 @@ Scene_Battle.prototype.initialize = function() {
 CombatScene.Scene_Battle_update = Scene_Battle.prototype.update;
 Scene_Battle.prototype.update = function() {
     CombatScene.Scene_Battle_update.call(this);
-    var action = BattleManager.inputtingAction();
+    var action = BattleManager._action;
     if (action && action.needCombatScene()) {
         if (this.isSceneChangeOk() && BattleManager.isStartCombat()) {
             SceneManager.push(Scene_Combat);
@@ -428,5 +423,3 @@ Sprite_Enemy.prototype.setHomeEnemySideView = function(index) {
     var centerX = Graphics.width / 2;
     this.setHome(centerX - 300 - index * 32, 300 + index * 96);
 };
-
-})();

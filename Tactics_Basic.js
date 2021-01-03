@@ -1,5 +1,5 @@
 //=============================================================================
-// Tactics_Basic.js v1.2
+// Tactics_Basic.js v1.2.1
 //=============================================================================
 
 /*:
@@ -1335,7 +1335,7 @@ BattleManager.updateExplore = function() {
 
 BattleManager.refreshMoveTiles = function() {
     var select = $gameSelector.select();
-    if (select) {
+    if (select) {
         $gameMap.setMoveColor();
         select.makeMoves();
     } else {
@@ -2202,10 +2202,12 @@ Game_Action.prototype.isAttackRange = function (subject) {
 
 Game_Action.prototype.updateRange = function(item, x, y) {
     var data = this.extractRangeData(item);
+    // range: 10 -> range: 0 10
     if (data[1] === undefined) {
         data[1] = data[0];
         data[0] = 0;
     }
+    // range: 
     if (data[2] === undefined) {
         data[2] = 'diamond';
     }
@@ -3016,7 +3018,7 @@ Game_Party.prototype.memberId = function(partyId) {
 Game_Troop.prototype.setupTactics = function(enemies) {
     this._enemies = [];
     enemies.forEach(function(member) {
-        if (!member.isBattleMember()) {
+        if (member && !member.isBattleMember()) {
             this._enemies.push(member);
         }
     }, this)
@@ -4702,7 +4704,7 @@ Window_TacticsStatus.prototype.drawBattlerStatus = function() {
     if (this._battler.isActor()) {
         this.drawActorFrame();
         this.drawActorSimpleStatus(this._battler, 0, 0, 376);
-    } else {
+    } else {
         this.drawEnemyFrame();
         this.drawEnemySimpleStatus(this._battler, 0, 0, 376);
     }

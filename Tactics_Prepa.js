@@ -104,6 +104,7 @@ Game_Interpreter.prototype.prepaMenuClose = function() {
 BattlePreparation.Scene_Battle_start = Scene_Battle.prototype.start;
 Scene_Battle.prototype.start = function() {
     BattlePreparation.Scene_Battle_start.call(this);
+    TacticsSystem.Game_Screen_onBattleStart.call($gameScreen);
     if (this._registerWindow2) {
         this._registerWindow2.refresh();
     }
